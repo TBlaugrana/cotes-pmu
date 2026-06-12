@@ -618,7 +618,7 @@ const AUTO_ADVANCE_MIN = 5;
 const REFRESH_SEC = 5;
 // ║  COTE_MIN / COTE_MAX : plage de cotes surveillée                            ║
 const COTE_MIN = 1.0;
-const COTE_MAX = 10.0;
+const COTE_MAX = 100.0;
 // ║  DROP_ALERT : seuil de chute (%) pour déclencher une alerte                 ║
 const DROP_ALERT = 10.0;
 // ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -736,18 +736,18 @@ async function fetchOdds(rNum, cNum) {
     const data = await pmuFetch(`/${today()}/R${rNum}/C${cNum}/participants`);
     const odds = {};
     for (const p of (data?.participants || [])) {
-      const num = String(p.numPmu ?? p.numero ?? "");
+      if (p.statut === "NON_PARTANT") continue;
+      const num = String(p.numPmu ?? "");
       const nom = p.nom ?? `#${num}`;
-      const crd = p.dernierRapportDirectMini ?? p.dernierRapportDirect ?? {};
-      let val   = (typeof crd === "object" ? crd.rapport : null)
-               ?? p.coteDirect ?? p.cote ?? p.rapportDirect;
-      if (num && val) {
-        try { odds[num] = { nom: nom.trim(), cote: parseFloat(val) }; }
-        catch(_) {}
+      // L'API PMU retourne la cote dans dernierRapportDirect.rapport
+      const val = p.dernierRapportDirect?.rapport ?? p.dernierRapportDirectMini?.rapport ?? null;
+      if (num && val && parseFloat(val) > 0) {
+        odds[num] = { nom: nom.trim(), cote: parseFloat(val) };
       }
     }
     return odds;
-  } catch(_) {
+  } catch(e) {
+    console.warn("fetchOdds error:", e);
     return {};
   }
 }
