@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alerte Cotes Hippiques</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0d12;
+    --surface: #111520;
+    --border: #1e2535;
+    --accent: #00e5a0;
+    --accent-dim: rgba(0,229,160,0.12);
+    --alert: #ff4757;
+    --alert-dim: rgba(255,71,87,0.12);
+    --warn: #ffa502;
+    --text: #e8eaf0;
+    --muted: #556080;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 20px 16px 40px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    width: 40px; height: 40px;
+    background: var(--accent-dim);
+    border: 1.5px solid var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  h1 span { color: var(--accent); }
+
+  .badge {
+    margin-left: auto;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 20px;
+  }
+  .badge.off {
+    background: rgba(85,96,128,0.15);
+    border-color: var(--muted);
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+
+  input, select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+
+  input:focus, select:focus { border-color: var(--accent); }
+
+  .btn {
+    width: 100%;
+    padding: 13px;
+    border-radius: 10px;
+    border: none;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0d12;
+  }
+  .btn-danger {
+    background: var(--alert);
+    color: #fff;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-sm {
+    width: auto;
+    padding: 7px 14px;
+    font-size: 12px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    cursor: pointer;
+  }
+
+  #status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 9px;
+    font-size: 12px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    min-height: 40px;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 1.5s infinite;
+  }
+  .dot.alert { background: var(--alert); box-shadow: 0 0 8px var(--alert); }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  #horses-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  #horses-table th {
+    text-align: left;
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 0 6px 10px;
+    font-weight: 600;
+  }
+
+  #horses-table td {
+    padding: 8px 6px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    vertical-align: middle;
+  }
+
+  #horses-table tr td:first-child { font-family: var(--sans); font-size: 13px; font-weight: 500; }
+
+  .cote-val { font-weight: 700; }
+  .delta { font-size: 11px; }
+  .delta.down { color: var(--alert); }
+  .delta.up { color: var(--accent); }
+  .delta.neutral { color: var(--muted); }
+
+  .alert-row td { background: var(--alert-dim); }
+  .alert-row td:first-child { border-left: 2px solid var(--alert); border-radius: 2px; }
+
+  #log {
+    max-height: 130px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  #log .log-alert { color: var(--alert); }
+  #log .log-ok { color: var(--accent); }
+  #log .log-info { color: var(--muted); }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 30px 0;
+  }
+  .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+
+  .race-info-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+  .race-info-box .ri-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+  .race-info-box .ri-val { color: var(--accent); font-size: 13px; font-weight: 700; }
+  .race-info-box .ri-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+  .freq-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    margin-bottom: 14px;
+  }
+
+  .telegram-test { display: flex; gap: 8px; align-items: flex-end; }
+  .telegram-test input { margin-bottom: 0; flex: 1; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 24px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🏇</div>
+  <div>
+    <h1>Alerte <span>Cotes</span></h1>
+    <div style="font-size:11px;color:var(--muted);margin-top:1px">Surveillance temps réel · PMU Turfinfo</div>
+  </div>
+  <span class="badge off" id="main-badge">INACTIF</span>
+</header>
+
+<!-- PROCHAINE COURSE AUTO -->
+<div class="card">
+  <div class="card-title">Prochaine course détectée</div>
+  <div class="race-info-box" id="race-info-box">
+    <div class="ri-label">Course</div>
+    <div class="ri-val" id="ri-course">Recherche en cours...</div>
+    <div class="ri-sub" id="ri-sub">—</div>
+  </div>
+  <label>Seuil d'alerte (chute de cote en %)</label>
+  <input type="number" id="seuil" value="10" min="1" max="99">
+</div>
+
+<!-- SAISIE MANUELLE (fallback si proxy KO) -->
+<div class="card" id="manual-override-card" style="display:none">
+  <div class="card-title">Saisie manuelle de la course</div>
+  <label>Réunion (ex: R1)</label>
+  <input type="text" id="manual-reunion" placeholder="R1" maxlength="4">
+  <label>Course (ex: C3)</label>
+  <input type="text" id="manual-course" placeholder="C3" maxlength="4">
+  <button class="btn btn-primary" style="margin-top:4px" onclick="applyManualOverride()">Appliquer</button>
+</div>
+
+<!-- TELEGRAM -->
+<div class="card">
+  <div class="card-title">Telegram</div>
+  <label>Bot Token</label>
+  <input type="password" id="tg-token" placeholder="123456:ABCdef...">
+  <label>Chat ID</label>
+  <div class="telegram-test">
+    <input type="text" id="tg-chat" placeholder="ex: -1001234567890">
+    <button class="btn-sm" onclick="testTelegram()">Tester</button>
+  </div>
+</div>
+
+<!-- INTERVALLE -->
+<div class="card">
+  <div class="card-title">Fréquence de vérification</div>
+  <div class="freq-badge">⚡ Rafraîchissement toutes les 5 secondes</div>
+  <button class="btn btn-primary" id="start-btn" onclick="toggleSurveillance()">▶ Démarrer la surveillance</button>
+</div>
+
+<!-- STATUS -->
+<div id="status-bar">
+  <div class="dot" id="dot"></div>
+  <span id="status-text">En attente de démarrage</span>
+  <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--muted)" id="next-check"></span>
+</div>
+
+<!-- TABLEAU DES COTES -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div class="card-title" style="margin:0">Cotes en direct</div>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="last-update"></span>
+  </div>
+  <div id="table-container">
+    <div class="empty-state">
+      <div class="icon">📊</div>
+      <div>Lance la surveillance pour voir les cotes</div>
+    </div>
+  </div>
+</div>
+
+<!-- LOG -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div class="card-title" style="margin:0">Journal d'activité</div>
+    <button class="btn-sm" onclick="clearLog()">Effacer</button>
+  </div>
+  <div id="log"><span class="log-info">En attente...</span></div>
+</div>
+
+<footer>Les jeux d'argent peuvent créer une dépendance · Jouez responsablement</footer>
+
+<script>
+  // ── État ──────────────────────────────────────────────────
+  let running = false;
+  let timer = null;
+  let countdown = null;
+  const INTERVAL_SEC = 5;
+  let prevCotes = {};
+  let alertsOk = {};
+
+  // Prochaine course détectée automatiquement
+  let currentDate = '';
+  let currentReunion = '';
+  let currentCourse = '';
+  let currentLabel = '';
+
+  // ── Utilitaires ───────────────────────────────────────────
+  function todayStr() {
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    return `${dd}${mm}${yyyy}`;
+  }
+
+  function log(msg, type='info') {
+    const el = document.getElementById('log');
+    const t = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const line = document.createElement('div');
+    line.className = `log-${type}`;
+    line.textContent = `[${t}] ${msg}`;
+    el.insertBefore(line, el.firstChild);
+    if (el.children.length > 50) el.removeChild(el.lastChild);
+  }
+
+  function clearLog() {
+    document.getElementById('log').innerHTML = '<span class="log-info">Journal effacé</span>';
+  }
+
+  function setStatus(text, state='idle') {
+    document.getElementById('status-text').textContent = text;
+    const dot = document.getElementById('dot');
+    dot.className = 'dot' + (state==='active' ? ' active' : state==='alert' ? ' alert' : '');
+    const badge = document.getElementById('main-badge');
+    badge.textContent = state==='active' ? 'ACTIF' : state==='alert' ? '⚠ ALERTE' : 'INACTIF';
+    badge.className = 'badge' + (state==='idle' ? ' off' : '');
+  }
+
+  // ── Accès API PMU ─────────────────────────────────────────
+  const PMU_BASE = 'https://offline.turfinfo.api.pmu.fr/rest/client/7/programme';
+
+  // Fetch avec timeout compatible iOS Safari (pas d'AbortSignal.timeout)
+  function fetchWithTimeout(url, ms) {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(tid));
+  }
+
+  async function pmuFetch(path) {
+    const fullUrl = `${PMU_BASE}${path}`;
+
+    // 1) Appel direct — fonctionne si le fichier est ouvert en file:// sur iPhone
+    //    ou si l'API autorise CORS (parfois elle le fait sans cookies)
+    try {
+      const r = await fetchWithTimeout(fullUrl, 6000);
+      if (r.ok) return await r.json();
+    } catch(e) { /* CORS ou réseau → essai proxy */ }
+
+    // 2) Proxy corsproxy.io (plus fiable qu'allorigins en 2025)
+    try {
+      const proxy1 = `https://corsproxy.io/?url=${encodeURIComponent(fullUrl)}`;
+      const r = await fetchWithTimeout(proxy1, 7000);
+      if (r.ok) return await r.json();
+    } catch(e) { /* suivant */ }
+
+    // 3) Proxy allorigins (dernier recours)
+    const proxy2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(fullUrl)}`;
+    const r = await fetchWithTimeout(proxy2, 7000);
+    if (!r.ok) throw new Error(`Proxy erreur ${r.status}`);
+    return await r.json();
+  }
+
+  // ── Détection automatique de la prochaine course ──────────
+  async function detectNextRace() {
+    const date = todayStr();
+    document.getElementById('ri-course').textContent = 'Recherche en cours...';
+    document.getElementById('ri-sub').textContent = '—';
+    // Afficher la saisie manuelle dès le départ — l'utilisateur peut saisir
+    // pendant que la détection tourne en arrière-plan
+    const overrideCard = document.getElementById('manual-override-card');
+    if (overrideCard) overrideCard.style.display = 'block';
+
+    try {
+      const data = await pmuFetch(`/${date}`);
+      const reunions = data?.programme?.reunions || [];
+      const now = Date.now();
+      let best = null;
+      let bestDiff = Infinity;
+
+      for (const r of reunions) {
+        const rNum = r.numOfficiel || r.numero;
+        for (const c of r.courses || []) {
+          const cNum = c.numOrdre || c.numero;
+          // heureDepart = ms depuis minuit heure locale Paris
+          // On reconstruit le timestamp : minuit local + offset Paris
+          const heure = c.heureDepart || 0;
+          // Paris = UTC+1 hiver / UTC+2 été — on utilise l'offset du device
+          // L'API est cohérente avec l'heure locale française
+          const parisOffset = 60; // minutes (hiver) ; en été +120 mais l'API corrige
+          const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+          const ts = midnight.getTime() + heure;
+          const diff = ts - now;
+
+          if (diff > -60000 && diff < bestDiff) { // course pas encore passée (ou < 1min)
+            bestDiff = diff;
+            best = {
+              date, ts,
+              reunion: `R${rNum}`,
+              course: `C${cNum}`,
+              nom: c.libelle || c.libelleCourt || `Course ${cNum}`,
+              hippodrome: r.hippodrome?.libelleCourt || r.libelle || '',
+              heureDepart: new Date(ts).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}),
+            };
+          }
+        }
+      }
+
+      if (best) {
+        currentDate = best.date;
+        currentReunion = best.reunion;
+        currentCourse = best.course;
+        currentLabel = `${best.reunion}/${best.course}`;
+        document.getElementById('ri-course').textContent = `${best.reunion} · ${best.course} · ${best.nom}`;
+        document.getElementById('ri-sub').textContent = `${best.hippodrome} — départ ${best.heureDepart}`;
+        // Masquer la saisie manuelle si la détection a réussi
+        if (overrideCard) overrideCard.style.display = 'none';
+        log(`✓ Course détectée : ${best.reunion}/${best.course} à ${best.heureDepart}`, 'ok');
+        return true;
+      } else {
+        document.getElementById('ri-course').textContent = 'Aucune course à venir — saisie manuelle';
+        document.getElementById('ri-sub').textContent = 'Renseigne la réunion et la course ci-dessous';
+        log('Aucune course à venir trouvée — utilise la saisie manuelle', 'alert');
+        return false;
+      }
+
+    } catch(e) {
+      document.getElementById('ri-course').textContent = 'API indisponible — saisie manuelle';
+      document.getElementById('ri-sub').textContent = 'Renseigne la réunion et la course ci-dessous';
+      log(`Détection échouée (${e.message}) — utilise la saisie manuelle`, 'alert');
+      return false;
+    }
+  }
+
+  // ── API Turfinfo ──────────────────────────────────────────
+  async function fetchCotes() {
+    if (!currentDate || !currentReunion || !currentCourse) {
+      throw new Error('Aucune course détectée');
+    }
+    return await pmuFetch(`/${currentDate}/${currentReunion}/${currentCourse}/participants`);
+  }
+
+  function parseCotes(data) {
+    const participants = data?.participants || data?.data?.participants || [];
+    const result = [];
+    for (const p of participants) {
+      const num = p.numPmu || p.numero || p.numCheval;
+      const nom = p.nom || p.nomCheval || `#${num}`;
+      const cote = p.rapportDirect?.rapport
+        || p.dernierRapportDirect?.rapport
+        || p.rapport
+        || p.cote
+        || null;
+      if (num && cote !== null) {
+        result.push({ num, nom, cote: parseFloat(cote) });
+      }
+    }
+    return result;
+  }
+
+  // ── Tableau ───────────────────────────────────────────────
+  function renderTable(chevaux) {
+    if (!chevaux.length) {
+      document.getElementById('table-container').innerHTML =
+        `<div class="empty-state"><div>Aucun partant avec cote disponible</div></div>`;
+      return;
+    }
+
+    const seuil = parseFloat(document.getElementById('seuil').value) || 10;
+    let html = `<table id="horses-table">
+      <thead><tr>
+        <th>Cheval</th><th>N°</th><th>Cote</th><th>Δ %</th>
+      </tr></thead><tbody>`;
+
+    for (const c of chevaux) {
+      const prev = prevCotes[c.num];
+      let delta = null, deltaClass = 'neutral', deltaStr = '—';
+      if (prev !== undefined && prev !== null) {
+        delta = ((c.cote - prev) / prev) * 100;
+        deltaStr = (delta > 0 ? '+' : '') + delta.toFixed(1) + '%';
+        deltaClass = delta <= -seuil ? 'down' : delta > 0 ? 'up' : 'neutral';
+      }
+      const isAlert = delta !== null && delta <= -seuil;
+      html += `<tr class="${isAlert ? 'alert-row' : ''}">
+        <td>${c.nom}</td>
+        <td style="color:var(--muted)">${c.num}</td>
+        <td class="cote-val">${c.cote.toFixed(1)}</td>
+        <td class="delta ${deltaClass}">${deltaStr}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    document.getElementById('table-container').innerHTML = html;
+    document.getElementById('last-update').textContent = new Date().toLocaleTimeString('fr-FR');
+  }
+
+  // ── Telegram ──────────────────────────────────────────────
+  async function sendTelegram(message) {
+    const token = document.getElementById('tg-token').value.trim();
+    const chatId = document.getElementById('tg-chat').value.trim();
+    if (!token || !chatId) { log('Token ou Chat ID Telegram manquant', 'alert'); return false; }
+
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' })
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.description);
+      return true;
+    } catch(e) {
+      log(`Telegram erreur: ${e.message}`, 'alert');
+      return false;
+    }
+  }
+
+  async function testTelegram() {
+    log('Test Telegram...', 'info');
+    const ok = await sendTelegram('🏇 <b>Test alerte cotes</b>\nVotre bot est correctement configuré !');
+    if (ok) log('✓ Message Telegram envoyé avec succès', 'ok');
+  }
+
+  // ── Boucle principale ─────────────────────────────────────
+  async function checkCotes() {
+    setStatus('Récupération des cotes...', 'active');
+    try {
+      const data = await fetchCotes();
+      const chevaux = parseCotes(data);
+      const seuil = parseFloat(document.getElementById('seuil').value) || 10;
+
+      let hasAlert = false;
+      for (const c of chevaux) {
+        const prev = prevCotes[c.num];
+        if (prev !== undefined && prev !== null) {
+          const delta = ((c.cote - prev) / prev) * 100;
+          if (delta <= -seuil && !alertsOk[c.num]) {
+            hasAlert = true;
+            alertsOk[c.num] = true;
+            const msg = `🚨 <b>CHUTE DE COTE DÉTECTÉE</b>\n\n` +
+              `🐎 <b>${c.nom}</b> (N°${c.num})\n` +
+              `📉 Cote : ${prev.toFixed(1)} → ${c.cote.toFixed(1)}\n` +
+              `📊 Variation : ${delta.toFixed(1)}%\n` +
+              `📍 ${currentLabel}\n` +
+              `🕐 ${new Date().toLocaleTimeString('fr-FR')}`;
+            log(`🚨 ALERTE: ${c.nom} -${Math.abs(delta).toFixed(1)}%`, 'alert');
+            await sendTelegram(msg);
+          } else if (delta > 0) {
+            alertsOk[c.num] = false;
+          }
+        }
+      }
+
+      for (const c of chevaux) prevCotes[c.num] = c.cote;
+      renderTable(chevaux);
+      setStatus(hasAlert ? `⚠ Alerte détectée !` : `Surveillance active (${chevaux.length} partants)`,
+        hasAlert ? 'alert' : 'active');
+      if (!hasAlert) log(`Vérification OK — ${chevaux.length} partants`, 'info');
+
+    } catch(e) {
+      setStatus(`Erreur: ${e.message}`, 'idle');
+      log(`Erreur: ${e.message}`, 'alert');
+    }
+  }
+
+  // ── Countdown ─────────────────────────────────────────────
+  let nextCheckIn = 0;
+  function startCountdown() {
+    nextCheckIn = INTERVAL_SEC;
+    if (countdown) clearInterval(countdown);
+    countdown = setInterval(() => {
+      nextCheckIn--;
+      if (nextCheckIn >= 0)
+        document.getElementById('next-check').textContent = `prochain: ${nextCheckIn}s`;
+    }, 1000);
+  }
+
+  // ── Saisie manuelle (fallback proxy KO) ──────────────────
+  function applyManualOverride() {
+    const reunion = (document.getElementById('manual-reunion')?.value || '').trim().toUpperCase();
+    const course  = (document.getElementById('manual-course')?.value  || '').trim().toUpperCase();
+    if (!reunion || !course) { log('Veuillez renseigner la réunion et la course', 'alert'); return; }
+    currentDate    = todayStr();
+    currentReunion = reunion.startsWith('R') ? reunion : `R${reunion}`;
+    currentCourse  = course.startsWith('C')  ? course  : `C${course}`;
+    currentLabel   = `${currentReunion}/${currentCourse}`;
+    document.getElementById('ri-course').textContent = `${currentReunion} · ${currentCourse} (manuel)`;
+    document.getElementById('ri-sub').textContent    = 'Saisie manuelle appliquée';
+    // Masquer la card une fois appliquée
+    const overrideCard = document.getElementById('manual-override-card');
+    if (overrideCard) overrideCard.style.display = 'none';
+    log(`Course manuelle définie : ${currentLabel}`, 'ok');
+  }
+
+  // ── Toggle ────────────────────────────────────────────────
+  async function toggleSurveillance() {
+    if (running) {
+      running = false;
+      if (timer) clearInterval(timer);
+      if (countdown) clearInterval(countdown);
+      document.getElementById('start-btn').textContent = '▶ Démarrer la surveillance';
+      document.getElementById('start-btn').className = 'btn btn-primary';
+      document.getElementById('next-check').textContent = '';
+      setStatus('Surveillance arrêtée', 'idle');
+      log('Surveillance arrêtée', 'info');
+    } else {
+      if (!currentDate) {
+        log('Détection de la prochaine course en cours...', 'info');
+        await detectNextRace();
+        if (!currentDate) {
+          log('⚠ Définis la course manuellement puis relance', 'alert');
+          return;
+        }
+      }
+      running = true;
+      prevCotes = {};
+      alertsOk = {};
+      document.getElementById('start-btn').textContent = '⏹ Arrêter';
+      document.getElementById('start-btn').className = 'btn btn-danger';
+      log('Surveillance démarrée', 'ok');
+      await checkCotes();
+      startCountdown();
+      timer = setInterval(async () => {
+        if (!running) return;
+        await checkCotes();
+        startCountdown();
+      }, INTERVAL_SEC * 1000);
+    }
+  }
+
+  // ── Détection au chargement ───────────────────────────────
+  detectNextRace();
+
+  // ── Keep screen awake (iOS Safari) ────────────────────────
+  if ('wakeLock' in navigator) {
+    document.getElementById('start-btn').addEventListener('click', async () => {
+      try { await navigator.wakeLock.request('screen'); } catch(e) {}
+    });
+  }
+</script>
+</body>
+</html>
