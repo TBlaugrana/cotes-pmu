@@ -635,15 +635,27 @@ const PMU_HEADERS = {
   "Cache-Control"  : "no-cache",
 };
 
+// ⚙️ Mets ici l'URL de ton Cloudflare Worker après déploiement
+// Ex: "https://pmu-proxy.TON-PSEUDO.workers.dev"
+const CF_WORKER = "https://morning-violet-2ec0.chupinou.workers.dev";
+
 // Stratégies tentées dans l'ordre
 const PROXY_STRATEGIES = [
   {
-    // Appel direct — fonctionne si l'API PMU autorise le CORS depuis ce domaine
+    // ✅ Cloudflare Worker — proxy fiable, gratuit, fonctionne sur mobile
+    label: "cloudflare",
+    build: url => {
+      const path = url.replace("https://online.turfinfo.api.pmu.fr/rest/client/7/programme", "");
+      return { fetchUrl: CF_WORKER + path, options: {} };
+    },
+  },
+  {
+    // Appel direct
     label: "direct",
     build: url => ({ fetchUrl: url, options: { headers: PMU_HEADERS } }),
   },
   {
-    // corsproxy.io avec transmission des headers PMU via x-cors-headers
+    // corsproxy.io avec headers PMU
     label: "corsproxy.io",
     build: url => ({
       fetchUrl: `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -651,19 +663,8 @@ const PROXY_STRATEGIES = [
     }),
   },
   {
-    // corsproxy.io sans headers custom (fallback)
-    label: "corsproxy.io (simple)",
-    build: url => ({ fetchUrl: `https://corsproxy.io/?${encodeURIComponent(url)}`, options: {} }),
-  },
-  {
-    // allorigins
     label: "allorigins",
     build: url => ({ fetchUrl: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, options: {} }),
-  },
-  {
-    // thingproxy
-    label: "thingproxy",
-    build: url => ({ fetchUrl: `https://thingproxy.freeboard.io/fetch/${url}`, options: {} }),
   },
 ];
 let _proxyIdx = 0;
@@ -1223,3 +1224,4 @@ window.onload = () => loadAllCourses();
 </script>
 </body>
 </html>
+
