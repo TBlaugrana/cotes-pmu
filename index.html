@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TBlaugrana BOT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #f5f6f8;
+  --surface:  #ffffff;
+  --surface2: #f0f1f4;
+  --border:   #e2e5eb;
+  --border2:  #d0d4de;
+  --text:     #1a1d26;
+  --muted:    #8892a4;
+  --dim:      #b0b8c8;
+  --accent:   #00a86b;
+  --accent-bg:#e6f7f1;
+  --warn:     #e07800;
+  --warn-bg:  #fff3e0;
+  --danger:   #d9163a;
+  --danger-bg:#fdeef2;
+  --yellow:   #c49a00;
+  --yellow-bg:#fdf8e1;
+  --mono:     'DM Mono', monospace;
+  --cond:     'Barlow Condensed', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TITLE BANNER ───────────────────────────────────── */
+#titleBanner {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 15px;
+  text-align: center;
+  position: relative;
+}
+#titleBanner h1 {
+  font-family: var(--cond);
+  font-weight: 900;
+  font-size: 33px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+#proxyStatus {
+  position: absolute;
+  top: 50%; left: 12px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 1px;
+}
+
+/* ── COUNTDOWN BANNER ───────────────────────────────── */
+#countdownBanner {
+  flex-shrink: 0;
+  height: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  transition: height 0.3s ease;
+  position: relative;
+}
+#countdownBanner.visible { height: 82px; }
+#countdownBanner::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 10%; right: 10%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.15} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+#cdIcon { font-size: 28px; opacity: 0.5; }
+#cdWrap { display: flex; flex-direction: column; align-items: center; }
+#cdMain {
+  font-family: var(--cond);
+  font-weight: 900;
+  font-size: 50px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.3s;
+}
+#cdMain.soon     { color: var(--warn); }
+#cdMain.imminent { color: var(--danger); animation: pulse 0.7s ease infinite; }
+#cdMain.gone     { color: var(--muted); font-size: 30px; letter-spacing: 4px; }
+#cdSub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+#cdTime {
+  font-family: var(--cond);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+
+/* ── RACE NAVIGATOR ─────────────────────────────────── */
+.race-nav {
+  flex-shrink: 0;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.nav-btn {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 17px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  user-select: none;
+}
+.nav-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+.nav-btn:disabled { opacity: 0.28; cursor: default; }
+.nav-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.nav-course {
+  font-family: var(--cond);
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: 1px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.nav-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.nav-loading {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: 1px;
+  animation: pulse 1s ease infinite;
+}
+
+/* ── STATUS BAR ─────────────────────────────────────── */
+#statusBar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+#statusDot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+  flex-shrink: 0;
+}
+#statusDot.live  { background: var(--accent); box-shadow: 0 0 6px #00a86b66; animation: blink 1.4s ease infinite; }
+#statusDot.error { background: var(--danger); }
+#statusDot.wait  { background: var(--yellow); }
+#statusText { flex: 1; }
+#refreshInfo { color: var(--dim); font-size: 10px; }
+
+/* ── ALERT BANNER ────────────────────────────────────── */
+#alertBanner {
+  display: none;
+  flex-shrink: 0;
+  background: #c8000d;
+  color: #fff;
+  padding: 6px 14px;
+  font-family: var(--cond);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #9a000a;
+}
+#alertBanner.show { display: block; }
+
+/* ── ERROR ──────────────────────────────────────────── */
+.error-box {
+  flex-shrink: 0;
+  margin: 7px 15px;
+  padding: 7px 11px;
+  background: var(--danger-bg);
+  border: 1px solid #f5c0cc;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--danger);
+  display: none;
+}
+.error-box.show { display: block; }
+
+/* ── COL HEADERS ────────────────────────────────────── */
+.col-headers {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 44px 1fr 60px 68px 76px;
+  padding: 7px 14px 6px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  background: var(--surface2);
+  border-bottom: 2px solid var(--border);
+}
+.col-headers > div { text-align: center; }
+.col-headers > div:nth-child(2) { text-align: left; }
+.col-headers > div:nth-child(3),
+.col-headers > div:nth-child(4),
+.col-headers > div:nth-child(5) { text-align: right; }
+
+/* ── ROWS ────────────────────────────────────────────── */
+#rows {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg);
+}
+#rows::-webkit-scrollbar { width: 4px; }
+#rows::-webkit-scrollbar-track { background: transparent; }
+#rows::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.row {
+  display: grid;
+  grid-template-columns: 44px 1fr 60px 68px 76px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  background: var(--surface);
+  height: 60px;
+  transition: background 0.1s;
+  position: relative;
+}
+.row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: transparent;
+  border-radius: 0 2px 2px 0;
+}
+.row:hover { background: var(--surface2); }
+
+.row.hi-alert { background: var(--danger-bg); }
+.row.hi-alert::before { background: var(--danger); }
+.row.hi-alert:hover   { background: #fce8ed; }
+
+.row.hi-high { background: var(--danger-bg); }
+.row.hi-high::before { background: var(--danger); }
+.row.hi-high:hover   { background: #fce8ed; }
+
+.row.hi-mid  { background: var(--warn-bg); }
+.row.hi-mid::before  { background: var(--warn); }
+.row.hi-mid:hover    { background: #fdefd4; }
+
+.row.hi-low  { background: var(--surface); }
+.row.hi-low::before  { background: var(--yellow); }
+.row.hi-low:hover    { background: var(--surface2); }
+
+.row > div { display: flex; align-items: center; overflow: hidden; }
+.row > div:not(.row-nom) { justify-content: flex-end; }
+
+.row-num {
+  font-family: var(--cond);
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--muted);
+  justify-content: center !important;
+  width: 100%;
+}
+
+.row-nom {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 21px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 5px;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.alert-tag {
+  font-size: 15px;
+  margin-left: 3px;
+  flex-shrink: 0;
+  line-height: 1;
+  letter-spacing: 1px;
+  animation: tagPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.drop-memory-tag {
+  font-size: 13px;
+  margin-left: 3px;
+  flex-shrink: 0;
+  line-height: 1;
+  opacity: 0.75;
+}
+@keyframes tagPop {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.row-prev { font-size: 12px; color: var(--dim); font-family: var(--mono); }
+.row-cote { font-family: var(--cond); font-size: 32px; font-weight: 700; color: var(--text); padding-right: 4px; }
+.row-drop { font-family: var(--cond); font-size: 25px; font-weight: 900; padding-left: 6px; }
+
+/* Colonnes Préc. et Δ masquées avant le départ */
+body:not(.race-started) .col-headers > div:nth-child(3),
+body:not(.race-started) .col-headers > div:nth-child(5),
+body:not(.race-started) .row-prev,
+body:not(.race-started) .row-drop { visibility: hidden; }
+
+.c-up   { color: var(--accent); }
+.c-none { color: var(--dim); }
+.c-low  { color: var(--yellow); }
+.c-mid  { color: var(--warn); }
+.c-high { color: var(--danger); }
+
+/* ── EMPTY ──────────────────────────────────────────── */
+.empty {
+  padding: 44px 15px;
+  text-align: center;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 2.4;
+  letter-spacing: 1px;
+}
+.empty .icon { font-size: 30px; opacity: 0.4; display: block; margin-bottom: 10px; }
+
+/* ── ALERTS PANEL ───────────────────────────────────── */
+#alertsPanel {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-top: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+#alertsPanel.has-alerts { max-height: 200px; }
+
+#alertsPanelHeader {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+#alertsPanelHeader:hover { background: #eaecf2; }
+
+#alertsTitle {
+  font-family: var(--cond);
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#alertsBadge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: var(--danger);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
+#alertsBadge.show { display: inline-flex; }
+
+#alertsClear {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+#alertsClear:hover { color: var(--danger); border-color: var(--danger); }
+
+#alertsList {
+  overflow-y: auto;
+  flex: 1;
+}
+#alertsList::-webkit-scrollbar { width: 4px; }
+#alertsList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.alert-row {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  height: 42px;
+  border-bottom: 1px solid var(--border);
+  background: var(--danger-bg);
+  gap: 0;
+  animation: alertRowIn 0.25s ease both;
+  overflow: hidden;
+}
+@keyframes alertRowIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.alert-row-race {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  width: 52px;
+  flex-shrink: 0;
+}
+.alert-row-num { display: none; }
+.alert-row-nom {
+  font-family: var(--cond);
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.3px;
+  flex: 1;
+  min-width: 0;
+}
+.alert-row-prev {
+  font-size: 12px;
+  color: var(--dim);
+  font-family: var(--mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+.alert-row-arrow {
+  font-size: 13px;
+  color: var(--danger);
+  font-family: var(--mono);
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.alert-row-cote {
+  font-family: var(--cond);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--danger);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.alert-row-drop {
+  font-family: var(--cond);
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+  background: var(--danger);
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+.alert-row-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  margin-left: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<!-- TITLE BANNER -->
+<div id="titleBanner">
+  <span id="proxyStatus"></span>
+  <h1>TBlaugrana BOT</h1>
+</div>
+
+<!-- COUNTDOWN BANNER -->
+<div id="countdownBanner">
+  <div id="cdTime"></div>
+  <div id="cdWrap">
+    <div id="cdMain">--:--</div>
+    <div id="cdSub">avant le départ</div>
+  </div>
+  <div id="cdIcon">🏇</div>
+</div>
+
+<!-- RACE NAVIGATOR -->
+<div class="race-nav">
+  <button class="nav-btn" id="btnPrev" onclick="navCourse(-1)" disabled title="Course précédente">◀</button>
+  <div class="nav-info">
+    <div class="nav-course" id="navCourse"><span class="nav-loading">Chargement...</span></div>
+    <div class="nav-meta" id="navMeta"></div>
+  </div>
+  <button class="nav-btn" id="btnNext" onclick="navCourse(+1)" disabled title="Course suivante">▶</button>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusBar">
+  <div id="statusDot"></div>
+  <span id="statusText">Connexion...</span>
+  <span id="refreshInfo"></span>
+</div>
+
+<!-- ALERT BANNER -->
+<div id="alertBanner"></div>
+
+<!-- ERROR -->
+<div id="errBox" class="error-box"></div>
+
+<!-- COL HEADERS -->
+<div class="col-headers">
+  <div>#</div>
+  <div>Cheval</div>
+  <div>Préc.</div>
+  <div>Cote</div>
+  <div>Δ 5s</div>
+</div>
+
+<!-- ROWS -->
+<div id="rows"></div>
+
+<!-- ALERTS PANEL -->
+<div id="alertsPanel">
+  <div id="alertsPanelHeader" onclick="toggleAlertsPanel()">
+    <div id="alertsTitle">
+      🔔 Alertes
+      <span id="alertsBadge"></span>
+    </div>
+    <button id="alertsClear" onclick="event.stopPropagation(); clearAlerts()">Effacer</button>
+  </div>
+  <div id="alertsList"></div>
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║                     ⚙️  PARAMETRES UTILISATEUR                              ║
+// ╠══════════════════════════════════════════════════════════════════════════════╣
+// ║  AUTO_ADVANCE_MIN : minutes avant passage auto à la course suivante         ║
+const AUTO_ADVANCE_MIN = 5;
+// ║  REFRESH_SEC : intervalle en secondes entre deux appels à l'API PMU         ║
+const REFRESH_SEC = 5;
+// ║  COTE_MIN / COTE_MAX : plage de cotes surveillée                            ║
+const COTE_MIN = 1.0;
+const COTE_MAX = 10.0;
+// ║  DROP_ALERT : seuil de chute (%) pour déclencher une alerte                 ║
+const DROP_ALERT = 10.0;
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+// ── API PMU (appelée directement via proxy CORS) ─────────────────────────────
+const PMU_BASE = "https://online.turfinfo.api.pmu.fr/rest/client/7/programme";
+
+// Headers que l'API PMU attend (reproduit exactement server.py)
+const PMU_HEADERS = {
+  "User-Agent"     : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept"         : "application/json, */*",
+  "Accept-Language": "fr-FR,fr;q=0.9",
+  "Referer"        : "https://www.pmu.fr/",
+  "Cache-Control"  : "no-cache",
+};
+
+// Stratégies tentées dans l'ordre
+const PROXY_STRATEGIES = [
+  {
+    // Appel direct — fonctionne si l'API PMU autorise le CORS depuis ce domaine
+    label: "direct",
+    build: url => ({ fetchUrl: url, options: { headers: PMU_HEADERS } }),
+  },
+  {
+    // corsproxy.io avec transmission des headers PMU via x-cors-headers
+    label: "corsproxy.io",
+    build: url => ({
+      fetchUrl: `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      options: { headers: { "x-cors-headers": JSON.stringify(PMU_HEADERS) } },
+    }),
+  },
+  {
+    // corsproxy.io sans headers custom (fallback)
+    label: "corsproxy.io (simple)",
+    build: url => ({ fetchUrl: `https://corsproxy.io/?${encodeURIComponent(url)}`, options: {} }),
+  },
+  {
+    // allorigins
+    label: "allorigins",
+    build: url => ({ fetchUrl: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, options: {} }),
+  },
+  {
+    // thingproxy
+    label: "thingproxy",
+    build: url => ({ fetchUrl: `https://thingproxy.freeboard.io/fetch/${url}`, options: {} }),
+  },
+];
+let _proxyIdx = 0;
+
+function today() {
+  const d = new Date();
+  const dd   = String(d.getDate()).padStart(2, "0");
+  const mm   = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}${mm}${yyyy}`;
+}
+
+async function pmuFetch(path) {
+  const url = PMU_BASE + path;
+  const errors = [];
+
+  for (let attempt = 0; attempt < PROXY_STRATEGIES.length; attempt++) {
+    const idx = (_proxyIdx + attempt) % PROXY_STRATEGIES.length;
+    const strategy = PROXY_STRATEGIES[idx];
+    const { fetchUrl, options } = strategy.build(url);
+    try {
+      const resp = await fetch(fetchUrl, { ...options, signal: AbortSignal.timeout(6000) });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (idx !== _proxyIdx) {
+        _proxyIdx = idx;
+        document.getElementById("proxyStatus").textContent = strategy.label;
+      }
+      return data;
+    } catch(e) {
+      errors.push(`[${strategy.label}] ${e.message}`);
+    }
+  }
+  throw new Error("Échec toutes stratégies :\n" + errors.join(" | "));
+}
+
+// ── Fetch réunions ────────────────────────────────────────────────────────────
+async function fetchReunions() {
+  const data = await pmuFetch(`/${today()}`);
+  const out = [];
+  for (const r of (data?.programme?.reunions || [])) {
+    const num  = r.numOfficiel ?? r.numExterne ?? 0;
+    const lieu = r.hippodrome?.libelleLong ?? r.hippodrome?.libelleCourt ?? "?";
+    out.push({ id: String(num), num, label: `R${num} — ${lieu}` });
+  }
+  return out;
+}
+
+// ── Fetch courses ─────────────────────────────────────────────────────────────
+async function fetchCourses(rNum) {
+  const data = await pmuFetch(`/${today()}/R${rNum}`);
+  const rawCourses = data?.courses ?? data?.reunion?.courses ?? [];
+  return rawCourses.map(c => {
+    const num   = c.numOrdre ?? 0;
+    const label = c.libelle ?? `Course ${num}`;
+    let heure   = "";
+    const ts    = c.heureDepart;
+    if (ts) {
+      try { heure = new Date(parseInt(ts)).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
+      catch(_) {}
+    }
+    return { id: String(num), num, label: `C${num} — ${label}`, heure, heureDepart: ts };
+  });
+}
+
+// ── Fetch cotes ───────────────────────────────────────────────────────────────
+async function fetchOdds(rNum, cNum) {
+  try {
+    const data = await pmuFetch(`/${today()}/R${rNum}/C${cNum}/participants`);
+    const odds = {};
+    for (const p of (data?.participants || [])) {
+      const num = String(p.numPmu ?? p.numero ?? "");
+      const nom = p.nom ?? `#${num}`;
+      const crd = p.dernierRapportDirectMini ?? p.dernierRapportDirect ?? {};
+      let val   = (typeof crd === "object" ? crd.rapport : null)
+               ?? p.coteDirect ?? p.cote ?? p.rapportDirect;
+      if (num && val) {
+        try { odds[num] = { nom: nom.trim(), cote: parseFloat(val) }; }
+        catch(_) {}
+      }
+    }
+    return odds;
+  } catch(_) {
+    return {};
+  }
+}
+
+// ── État interne ──────────────────────────────────────────────────────────────
+let _selectedReunion = null;
+let _selectedCourse  = null;
+let _odds            = {};
+let _oddsPrev        = {};
+let _droppedHorses   = new Set();
+let _departTs        = null;
+let _departStr       = "";
+let _refreshCount    = 0;
+let _lastOddsChangeTs = null;
+let _refreshTimer    = null;
+
+// ── Boucle de refresh ─────────────────────────────────────────────────────────
+async function refreshLoop() {
+  if (!_selectedReunion || !_selectedCourse) {
+    setStatusDot("wait");
+    document.getElementById("statusText").textContent = "En attente";
+    _refreshTimer = setTimeout(refreshLoop, 500);
+    return;
+  }
+
+  setStatusDot("wait");
+  document.getElementById("statusText").textContent = "Récupération...";
+
+  try {
+    const odds = await fetchOdds(_selectedReunion, _selectedCourse);
+    const now  = Date.now();
+
+    if (Object.keys(odds).length > 0) {
+      // Détecter changement de cotes
+      const oddsChanged = !Object.keys(_odds).length ||
+        Object.keys({ ..._odds, ...odds }).some(k =>
+          (odds[k]?.cote) !== (_odds[k]?.cote));
+
+      _oddsPrev = { ..._odds };
+      _odds     = odds;
+      _refreshCount++;
+
+      if (oddsChanged) _lastOddsChangeTs = now;
+
+      setStatusDot("live");
+      document.getElementById("statusText").textContent  = "LIVE · " + new Date().toLocaleTimeString("fr-FR");
+      document.getElementById("refreshInfo").textContent = `refresh #${_refreshCount}`;
+      hideErr();
+    } else {
+      document.getElementById("statusText").textContent = "En attente des cotes";
+    }
+
+    // Détecter cotes figées → avance auto
+    if (_lastOddsChangeTs && !_frozenAutoAdvanced && !_loadingNav) {
+      const frozenSec = (now - _lastOddsChangeTs) / 1000;
+      if (frozenSec >= AUTO_ADVANCE_MIN * 60 && _curIdx < _allCourses.length - 1) {
+        _frozenAutoAdvanced = true;
+        document.getElementById("statusText").textContent = "Cotes figées — passage course suivante...";
+        setTimeout(() => navCourse(+1), 1500);
+      }
+    }
+
+    renderFromState();
+
+  } catch(e) {
+    setStatusDot("error");
+    document.getElementById("statusText").textContent = "Erreur";
+    showErr("Erreur API PMU : " + e.message);
+  }
+
+  _refreshTimer = setTimeout(refreshLoop, REFRESH_SEC * 1000);
+}
+
+function renderFromState() {
+  const depTs       = _departTs;
+  const nowMs       = Date.now();
+  const raceStarted = depTs && nowMs >= depTs;
+
+  if (raceStarted) document.body.classList.add("race-started");
+
+  const rows = [];
+  for (const [num, info] of Object.entries(_odds)) {
+    const coteNow  = info.cote;
+    const cotePrev = _oddsPrev[num]?.cote ?? null;
+    let dropPct    = 0;
+    let alert      = false;
+    if (cotePrev && cotePrev > 0) {
+      dropPct = Math.round((cotePrev - coteNow) / cotePrev * 1000) / 10;
+      if (raceStarted && dropPct >= DROP_ALERT && coteNow >= COTE_MIN && coteNow <= COTE_MAX) {
+        alert = true;
+      }
+      if (dropPct >= DROP_ALERT && coteNow >= COTE_MIN && coteNow <= COTE_MAX) {
+        _droppedHorses.add(num);
+      }
+    }
+    rows.push({
+      num, nom: info.nom, cote_now: coteNow, cote_prev: cotePrev,
+      drop_pct: dropPct, alert, ever_dropped: _droppedHorses.has(num),
+    });
+  }
+  rows.sort((a, b) => a.cote_now - b.cote_now);
+
+  // Filtrer cotes > 10 (même logique que l'original)
+  const filteredRows = rows.filter(r => r.cote_now <= COTE_MAX);
+
+  // Alertes panel
+  if (!_courseChangePending && filteredRows.some(r => r.alert)) {
+    const cur = _allCourses[_curIdx];
+    _pushAlerts(filteredRows, cur ? `R${cur.rId}C${cur.cId}` : "?");
+  }
+  if (_courseChangePending && _refreshCount > 0 && filteredRows.length > 0) {
+    _courseChangePending = false;
+  }
+
+  renderRows(filteredRows, !!raceStarted);
+}
+
+// ── Navigation state ──────────────────────────────────────────────────────────
+let _allCourses   = [];
+let _curIdx       = -1;
+let _loadingNav   = false;
+let _autoAdvanced = false;
+let _frozenAutoAdvanced  = false;
+let _courseChangePending = true;
+
+// ── Countdown ─────────────────────────────────────────────────────────────────
+let _cdInterval  = null;
+let _departTsLoc = null;
+
+function startCountdown(departTs, departStr) {
+  _departTsLoc = departTs;
+  if (_cdInterval) clearInterval(_cdInterval);
+
+  const banner = document.getElementById("countdownBanner");
+  const cdMain = document.getElementById("cdMain");
+  const cdSub  = document.getElementById("cdSub");
+  const cdTime = document.getElementById("cdTime");
+
+  banner.classList.add("visible");
+  cdTime.textContent = departStr || "";
+
+  function tick() {
+    const now = Date.now();
+    const sec = Math.round((_departTsLoc - now) / 1000);
+    if (sec > 0) {
+      const m  = Math.floor(sec / 60);
+      const ss = String(sec % 60).padStart(2, "0");
+      cdMain.textContent = `-${m}:${ss}`;
+      cdMain.className   = sec <= 60 ? "imminent" : sec <= 180 ? "soon" : "";
+      cdSub.textContent  = "avant le départ";
+      document.body.classList.remove("race-started");
+      _autoAdvanced = false;
+    } else {
+      const elapsed = Math.abs(sec);
+      const em = Math.floor(elapsed / 60);
+      const es = String(elapsed % 60).padStart(2, "0");
+      cdMain.textContent = `+${em}:${es}`;
+      cdMain.className   = "gone";
+      cdSub.textContent  = "après le départ";
+      document.body.classList.add("race-started");
+
+      if (elapsed >= AUTO_ADVANCE_MIN * 60 && !_autoAdvanced && _curIdx < _allCourses.length - 1) {
+        _autoAdvanced = true;
+        loadAllCourses(_curIdx + 1);
+      }
+    }
+  }
+  tick();
+  _cdInterval = setInterval(tick, 1000);
+}
+
+function stopCountdown() {
+  if (_cdInterval) { clearInterval(_cdInterval); _cdInterval = null; }
+  _departTsLoc = null;
+}
+
+// ── Chargement programme complet ──────────────────────────────────────────────
+async function loadAllCourses(autoSelectIdx = null) {
+  const currentCourse = _allCourses[_curIdx] || null;
+  setNavLoading("Récupération du programme...");
+
+  try {
+    const reunions = await fetchReunions();
+    if (!reunions.length) { setNavText("Aucune réunion aujourd'hui", ""); return; }
+
+    const all = [];
+    for (const reu of reunions) {
+      try {
+        const courses = await fetchCourses(reu.id);
+        for (const c of courses) {
+          all.push({
+            rId: reu.id, rLabel: reu.label,
+            cId: c.id, cHeure: c.heure, cLabel: c.label,
+            heureDepart: c.heureDepart ? parseInt(c.heureDepart) : null,
+          });
+        }
+      } catch(_) {}
+    }
+
+    if (!all.length) { setNavText("Aucune course trouvée", ""); return; }
+
+    all.sort((a, b) => {
+      const ta = a.heureDepart || 0, tb = b.heureDepart || 0;
+      if (ta !== tb) return ta - tb;
+      if (a.rId !== b.rId) return parseInt(a.rId) - parseInt(b.rId);
+      return parseInt(a.cId) - parseInt(b.cId);
+    });
+
+    _allCourses = all;
+
+    let targetIdx;
+    if (autoSelectIdx !== null) {
+      targetIdx = autoSelectIdx;
+    } else if (currentCourse) {
+      const found = all.findIndex(c => c.rId === currentCourse.rId && c.cId === currentCourse.cId);
+      targetIdx = found !== -1 ? found : _curIdx;
+    } else {
+      const now = Date.now();
+      targetIdx = all.findIndex(c => c.heureDepart && c.heureDepart > now);
+      if (targetIdx === -1) targetIdx = all.length - 1;
+      if (targetIdx < 0)   targetIdx = 0;
+    }
+    targetIdx = Math.max(0, Math.min(targetIdx, all.length - 1));
+    await selectCourseAt(targetIdx);
+
+  } catch(e) {
+    setNavText("Erreur API PMU", "");
+    showErr("Impossible de charger le programme : " + e.message);
+  }
+}
+
+async function navCourse(delta) {
+  if (_loadingNav) return;
+  const newIdx = _curIdx + delta;
+  if (newIdx < 0 || newIdx >= _allCourses.length) return;
+  await loadAllCourses(newIdx);
+}
+
+async function selectCourseAt(idx) {
+  if (idx < 0 || idx >= _allCourses.length) return;
+  _loadingNav = true;
+  _curIdx = idx;
+  updateNavButtons();
+
+  const c = _allCourses[idx];
+  const rShort = c.rLabel.replace(/^R\d+ — /, "").substring(0, 16);
+  const cName  = c.cLabel.replace(/^C\d+ — /, "").substring(0, 16);
+  document.getElementById("navCourse").textContent = `R${c.rId} C${c.cId}`;
+  document.getElementById("navMeta").textContent   = rShort + (cName ? "  ·  " + cName : "");
+
+  document.getElementById("rows").innerHTML = '';
+  document.getElementById("countdownBanner").classList.remove("visible");
+  document.getElementById("alertBanner").className = "";
+  document.body.classList.remove("race-started");
+
+  // Reset état pour la nouvelle course
+  _odds            = {};
+  _oddsPrev        = {};
+  _droppedHorses   = new Set();
+  _refreshCount    = 0;
+  _lastOddsChangeTs = null;
+  _flameCount      = {};
+  _flameSeen       = new Set();
+  _prevAlertState  = {};
+  _alertLog        = [];
+  _courseChangePending  = true;
+  _frozenAutoAdvanced   = false;
+  _autoAdvanced         = false;
+  _renderAlertLog();
+
+  stopCountdown();
+
+  _selectedReunion = c.rId;
+  _selectedCourse  = c.cId;
+  _departTs        = c.heureDepart || null;
+  _departStr       = c.cHeure || "";
+
+  if (c.heureDepart) startCountdown(c.heureDepart, c.cHeure || "");
+
+  // (Re)lancer la boucle de refresh
+  if (_refreshTimer) clearTimeout(_refreshTimer);
+  _refreshTimer = setTimeout(refreshLoop, 100);
+
+  _loadingNav = false;
+  updateNavButtons();
+}
+
+function updateNavButtons() {
+  document.getElementById("btnPrev").disabled = _loadingNav || _curIdx <= 0;
+  document.getElementById("btnNext").disabled = _loadingNav || _curIdx >= _allCourses.length - 1;
+}
+
+function setNavLoading(msg) {
+  document.getElementById("navCourse").innerHTML = `<span class="nav-loading">${msg}</span>`;
+  document.getElementById("navMeta").textContent = "";
+  document.getElementById("btnPrev").disabled = true;
+  document.getElementById("btnNext").disabled = true;
+}
+
+function setNavText(main, meta) {
+  document.getElementById("navCourse").textContent = main;
+  document.getElementById("navMeta").textContent   = meta;
+}
+
+// ── Alerts Panel ──────────────────────────────────────────────────────────────
+let _alertLog       = [];
+let _flameCount     = {};
+let _flameSeen      = new Set();
+let _prevAlertState = {};
+
+function _pushAlerts(rows, raceLabel) {
+  let added = false;
+  rows.forEach(r => {
+    const key      = `${raceLabel}-${r.num}`;
+    const wasAlert = _prevAlertState[key] || false;
+    const isAlert  = r.alert || false;
+    _prevAlertState[key] = isAlert;
+
+    if (isAlert && !wasAlert) {
+      _flameCount[key] = (_flameCount[key] || 0) + 1;
+      _alertLog.unshift({
+        race: raceLabel, num: r.num, nom: r.nom,
+        prev: r.cote_prev, cote: r.cote_now, drop: r.drop_pct,
+        time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      });
+      if (_alertLog.length > 3) _alertLog = _alertLog.slice(0, 3);
+      added = true;
+    }
+  });
+  if (added) _renderAlertLog();
+}
+
+function _renderAlertLog() {
+  const list  = document.getElementById("alertsList");
+  const badge = document.getElementById("alertsBadge");
+  const panel = document.getElementById("alertsPanel");
+
+  if (!_alertLog.length) {
+    panel.classList.remove("has-alerts");
+    badge.classList.remove("show");
+    list.innerHTML = "";
+    return;
+  }
+  panel.classList.add("has-alerts");
+  badge.textContent = Math.min(_alertLog.length, 3);
+  badge.classList.add("show");
+
+  list.innerHTML = _alertLog.map(a => {
+    const nom  = a.nom.length > 14 ? a.nom.substring(0, 13) + "." : a.nom;
+    const prev = a.prev ? a.prev.toFixed(1) : "—";
+    return `<div class="alert-row">
+      <span class="alert-row-race">${a.race}</span>
+      <span class="alert-row-num">${a.num}</span>
+      <span class="alert-row-nom">N°${a.num} ${nom}</span>
+      <span class="alert-row-prev">${prev}</span>
+      <span class="alert-row-arrow">→</span>
+      <span class="alert-row-cote">${a.cote.toFixed(1)}</span>
+      <span class="alert-row-drop">-${Math.abs(a.drop)}%</span>
+      <span class="alert-row-time">${a.time}</span>
+    </div>`;
+  }).join("");
+}
+
+function clearAlerts() {
+  _alertLog = []; _flameCount = {}; _flameSeen = new Set(); _prevAlertState = {};
+  _renderAlertLog();
+}
+
+function toggleAlertsPanel() {}
+
+// ── Rendu lignes ──────────────────────────────────────────────────────────────
+function renderRows(rows, raceStarted) {
+  const el          = document.getElementById("rows");
+  const alertBanner = document.getElementById("alertBanner");
+
+  if (!rows.length) {
+    const c = _curIdx >= 0;
+    el.innerHTML = c
+      ? '<div class="empty"><span class="icon">📡</span>En attente des cotes...<br><small style="color:var(--dim)">Les paris doivent être ouverts</small></div>'
+      : '<div class="empty"><span class="icon">🏇</span>Chargement du programme...</div>';
+    alertBanner.className = "";
+    alertBanner.textContent = "";
+    return;
+  }
+
+  const alertHorses = rows.filter(r => r.alert);
+  if (alertHorses.length > 0) {
+    alertBanner.textContent = alertHorses.map(r => `⚠ #${r.num} ${r.nom}  ${r.cote_now?.toFixed(1)} (▼${r.drop_pct}%)`).join("   ");
+    alertBanner.className = "show";
+  } else {
+    alertBanner.className = "";
+    alertBanner.textContent = "";
+  }
+
+  const existing = {};
+  el.querySelectorAll(".row[data-num]").forEach(r => existing[r.dataset.num] = r);
+  const newNums = new Set(rows.map(d => String(d.num)));
+  for (const num in existing) {
+    if (!newNums.has(num)) existing[num].remove();
+  }
+
+  rows.forEach((d, i) => {
+    const key = String(d.num);
+    let cls = "c-none", rowCls = "";
+    if (d.alert)          { cls = "c-high"; rowCls = "hi-alert"; }
+    else if (d.drop_pct > 35)  { cls = "c-high"; rowCls = "hi-high"; }
+    else if (d.drop_pct > 20)  { cls = "c-mid";  rowCls = "hi-mid"; }
+    else if (d.drop_pct > 0)   { cls = "c-low";  rowCls = "hi-low"; }
+    else if (d.drop_pct < 0)   { cls = "c-up"; }
+
+    const prev = d.cote_prev ? d.cote_prev.toFixed(1) : "—";
+    const sign = d.drop_pct > 0 ? "▼" : d.drop_pct < 0 ? "▲" : "";
+    const pct  = d.drop_pct !== 0 ? sign + Math.abs(d.drop_pct) + "%" : "—";
+    const nom  = d.nom.length > 12 ? d.nom.substring(0, 11) + "." : d.nom;
+    const cur  = _allCourses[_curIdx];
+    const raceLabel  = cur ? `R${cur.rId}C${cur.cId}` : "?";
+    const flameKey   = `${raceLabel}-${d.num}`;
+    const flames     = _flameCount[flameKey] || 0;
+    const alertHTML  = flames > 0 ? `<span class="alert-tag" data-flames="${flames}">${"🔥".repeat(flames)}</span>` : "";
+
+    if (existing[key]) {
+      const row = existing[key];
+      row.className = `row ${rowCls}`;
+      row.querySelector(".row-prev").textContent = prev;
+      const coteEl  = row.querySelector(".row-cote");
+      const newCote = d.cote_now.toFixed(1);
+      if (coteEl.textContent !== newCote) coteEl.textContent = newCote;
+      const dropEl  = row.querySelector(".row-drop");
+      dropEl.textContent = pct;
+      dropEl.className   = `row-drop ${cls}`;
+
+      let at = row.querySelector(".alert-tag");
+      if (flames > 0) {
+        if (!at) {
+          const span = document.createElement("span");
+          span.className = "alert-tag";
+          row.querySelector(".row-nom").appendChild(span);
+          at = span;
+        }
+        const newFlames = "🔥".repeat(flames);
+        if (at.textContent !== newFlames) { at.textContent = newFlames; at.dataset.flames = flames; }
+      } else if (at) {
+        at.remove();
+      }
+
+      const sibling = [...el.querySelectorAll(".row[data-num]")][i];
+      if (sibling !== row) el.insertBefore(row, sibling || null);
+    } else {
+      const div = document.createElement("div");
+      div.className = `row ${rowCls}`;
+      div.dataset.num = key;
+      div.innerHTML = `
+        <div class="row-num">${d.num}</div>
+        <div class="row-nom" title="${d.nom}">${nom}${alertHTML}</div>
+        <div class="row-prev">${prev}</div>
+        <div class="row-cote">${d.cote_now.toFixed(1)}</div>
+        <div class="row-drop ${cls}">${pct}</div>`;
+      const insertBefore = el.querySelectorAll(".row[data-num]")[i] || null;
+      el.insertBefore(div, insertBefore);
+    }
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setStatusDot(state) {
+  const dot = document.getElementById("statusDot");
+  dot.className = state === "live" ? "live" : state === "error" ? "error" : "wait";
+}
+function showErr(msg) { const e = document.getElementById("errBox"); e.textContent = msg; e.classList.add("show"); }
+function hideErr()    { document.getElementById("errBox").classList.remove("show"); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.onload = () => loadAllCourses();
+</script>
+</body>
+</html>
