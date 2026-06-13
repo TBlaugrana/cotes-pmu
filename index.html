@@ -911,7 +911,7 @@ function startCountdown(departTs, departStr) {
 
       if (elapsed >= AUTO_ADVANCE_MIN * 60 && !_autoAdvanced && _curIdx < _allCourses.length - 1) {
         _autoAdvanced = true;
-        selectCourseAt(_curIdx + 1);
+        loadAllCourses(_curIdx + 1);
       }
     }
   }
@@ -1003,12 +1003,14 @@ async function selectCourseAt(idx) {
   document.getElementById("alertBanner").className = "";
   document.body.classList.remove("race-started");
 
-  // Reset état pour la nouvelle course (on garde _flameCount et _flameSeen globaux pour toutes les courses)
+  // Reset état pour la nouvelle course
   _odds            = {};
   _oddsPrev        = {};
   _droppedHorses   = new Set();
   _refreshCount    = 0;
   _lastOddsChangeTs = null;
+  _flameCount      = {};
+  _flameSeen       = new Set();
   _prevAlertState  = {};
   _alertLog        = [];
   _courseChangePending  = true;
@@ -1110,7 +1112,7 @@ function _renderAlertLog() {
 }
 
 function clearAlerts() {
-  _alertLog = []; _prevAlertState = {};
+  _alertLog = []; _flameCount = {}; _flameSeen = new Set(); _prevAlertState = {};
   _renderAlertLog();
 }
 
