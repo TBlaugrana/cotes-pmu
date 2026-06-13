@@ -1186,6 +1186,37 @@ let _flameCount     = {};
 let _flameSeen      = new Set();
 let _prevAlertState = {};
 
+// Clé localStorage par date (ex: "tblaugrana_2026-06-13")
+function _storageKey() {
+  const d = new Date();
+  return `tblaugrana_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function _saveToStorage() {
+  try {
+    localStorage.setItem(_storageKey(), JSON.stringify({
+      alertLog:       _alertLog,
+      flameCount:     _flameCount,
+      prevAlertState: _prevAlertState,
+    }));
+  } catch(e) {}
+}
+
+function _loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(_storageKey());
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.alertLog)       _alertLog       = data.alertLog;
+    if (data.flameCount)     _flameCount     = data.flameCount;
+    if (data.prevAlertState) _prevAlertState = data.prevAlertState;
+    // Nettoyer les anciennes clés (jours précédents)
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith("tblaugrana_") && k !== _storageKey()) localStorage.removeItem(k);
+    }
+  } catch(e) {}
+}
+
 function _pushAlerts(rows, raceLabel) {
   let added = false;
   rows.forEach(r => {
@@ -1201,11 +1232,11 @@ function _pushAlerts(rows, raceLabel) {
         prev: r.cote_prev, cote: r.cote_now, drop: r.drop_pct,
         time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
       });
-      if (_alertLog.length > 3) _alertLog = _alertLog.slice(0, 3);
+      // Pas de limite — toutes les alertes du jour sont conservées
       added = true;
     }
   });
-  if (added) _renderAlertLog();
+  if (added) { _saveToStorage(); _renderAlertLog(); }
 }
 
 function _renderAlertLog() {
@@ -1220,10 +1251,10 @@ function _renderAlertLog() {
     return;
   }
   panel.classList.add("has-alerts");
-  badge.textContent = Math.min(_alertLog.length, 3);
+  badge.textContent = Math.min(_alertLog.length, 99);
   badge.classList.add("show");
 
-  list.innerHTML = _alertLog.map(a => {
+  list.innerHTML = _alertLog.slice(0, 3).map(a => {
     const nom  = a.nom.length > 14 ? a.nom.substring(0, 13) + "." : a.nom;
     const prev = a.prev ? a.prev.toFixed(1) : "—";
     return `<div class="alert-row">
@@ -1241,6 +1272,7 @@ function _renderAlertLog() {
 
 function clearAlerts() {
   _alertLog = []; _flameCount = {}; _flameSeen = new Set(); _prevAlertState = {};
+  try { localStorage.removeItem(_storageKey()); } catch(e) {}
   _renderAlertLog();
 }
 
@@ -1348,7 +1380,11 @@ function showErr(msg) { const e = document.getElementById("errBox"); e.textConte
 function hideErr()    { document.getElementById("errBox").classList.remove("show"); }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-window.onload = () => loadAllCourses();
+window.onload = () => {
+  _loadFromStorage();
+  if (_alertLog.length) _renderAlertLog();
+  loadAllCourses();
+};
 </script>
 </body>
 </html>
