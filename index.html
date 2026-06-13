@@ -211,6 +211,13 @@ html, body {
 #statusDot.wait  { background: var(--yellow); }
 #statusText { flex: 1; }
 #refreshInfo { color: var(--dim); font-size: 10px; }
+#hiddenInfo {
+  font-size: 10px;
+  color: var(--warn);
+  letter-spacing: 1px;
+  display: none;
+}
+#hiddenInfo.show { display: inline; }
 
 /* ── ALERT BANNER ────────────────────────────────────── */
 #alertBanner {
@@ -393,6 +400,7 @@ body:not(.race-started) .row-drop { visibility: hidden; }
   transition: max-height 0.35s ease;
 }
 #alertsPanel.has-alerts { max-height: 200px; }
+#alertsPanel.has-alerts.collapsed { max-height: 36px; }
 
 #alertsPanelHeader {
   flex-shrink: 0;
@@ -541,6 +549,29 @@ body:not(.race-started) .row-drop { visibility: hidden; }
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* Récidive : fond orange au lieu de rouge */
+.alert-row-recur {
+  background: var(--warn-bg);
+  border-left: 3px solid var(--warn);
+}
+.alert-row-recur .alert-row-cote  { color: var(--warn); }
+.alert-row-recur .alert-row-arrow { color: var(--warn); }
+.alert-row-recur .alert-row-drop  { background: var(--warn); }
+
+.alert-recur-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-left: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
 </style>
 </head>
 <body>
@@ -576,6 +607,7 @@ body:not(.race-started) .row-drop { visibility: hidden; }
   <div id="statusDot"></div>
   <span id="statusText">Connexion...</span>
   <span id="refreshInfo"></span>
+  <span id="hiddenInfo"></span>
 </div>
 
 <!-- ALERT BANNER -->
@@ -618,7 +650,7 @@ const AUTO_ADVANCE_MIN = 5;
 const REFRESH_SEC = 5;
 // ║  COTE_MIN / COTE_MAX : plage de cotes surveillée                            ║
 const COTE_MIN = 1.0;
-const COTE_MAX = 100.0;
+const COTE_MAX = 10.0;
 // ║  DROP_ALERT : seuil de chute (%) pour déclencher une alerte                 ║
 const DROP_ALERT = 10.0;
 // ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -736,18 +768,18 @@ async function fetchOdds(rNum, cNum) {
     const data = await pmuFetch(`/${today()}/R${rNum}/C${cNum}/participants`);
     const odds = {};
     for (const p of (data?.participants || [])) {
-      if (p.statut === "NON_PARTANT") continue;
-      const num = String(p.numPmu ?? "");
+      const num = String(p.numPmu ?? p.numero ?? "");
       const nom = p.nom ?? `#${num}`;
-      // L'API PMU retourne la cote dans dernierRapportDirect.rapport
-      const val = p.dernierRapportDirect?.rapport ?? p.dernierRapportDirectMini?.rapport ?? null;
-      if (num && val && parseFloat(val) > 0) {
-        odds[num] = { nom: nom.trim(), cote: parseFloat(val) };
+      const crd = p.dernierRapportDirectMini ?? p.dernierRapportDirect ?? {};
+      let val   = (typeof crd === "object" ? crd.rapport : null)
+               ?? p.coteDirect ?? p.cote ?? p.rapportDirect;
+      if (num && val) {
+        try { odds[num] = { nom: nom.trim(), cote: parseFloat(val) }; }
+        catch(_) {}
       }
     }
     return odds;
-  } catch(e) {
-    console.warn("fetchOdds error:", e);
+  } catch(_) {
     return {};
   }
 }
@@ -836,10 +868,10 @@ function renderFromState() {
     let alert      = false;
     if (cotePrev && cotePrev > 0) {
       dropPct = Math.round((cotePrev - coteNow) / cotePrev * 1000) / 10;
-      if (raceStarted && dropPct >= DROP_ALERT && coteNow >= COTE_MIN && coteNow <= COTE_MAX) {
+      if (raceStarted && dropPct >= DROP_ALERT) {
         alert = true;
       }
-      if (dropPct >= DROP_ALERT && coteNow >= COTE_MIN && coteNow <= COTE_MAX) {
+      if (dropPct >= DROP_ALERT) {
         _droppedHorses.add(num);
       }
     }
@@ -850,8 +882,16 @@ function renderFromState() {
   }
   rows.sort((a, b) => a.cote_now - b.cote_now);
 
-  // Filtrer cotes > 10 (même logique que l'original)
-  const filteredRows = rows.filter(r => r.cote_now <= COTE_MAX);
+  // Masquer les chevaux dont la cote dépasse COTE_MAX (> 10), toujours, live ou non
+  const filteredRows = rows.filter(r => r.cote_now >= COTE_MIN && r.cote_now <= COTE_MAX);
+  const hiddenCount  = rows.length - filteredRows.length;
+  const hiddenEl     = document.getElementById("hiddenInfo");
+  if (hiddenCount > 0) {
+    hiddenEl.textContent = `· ${hiddenCount} cheval${hiddenCount > 1 ? "x" : ""} > ${COTE_MAX} masqué${hiddenCount > 1 ? "s" : ""}`;
+    hiddenEl.classList.add("show");
+  } else {
+    hiddenEl.classList.remove("show");
+  }
 
   // Alertes panel
   if (!_courseChangePending && filteredRows.some(r => r.alert)) {
@@ -1012,7 +1052,7 @@ async function selectCourseAt(idx) {
   _flameCount      = {};
   _flameSeen       = new Set();
   _prevAlertState  = {};
-  _alertLog        = [];
+  // _alertLog intentionnellement conservé entre les courses
   _courseChangePending  = true;
   _frozenAutoAdvanced   = false;
   _autoAdvanced         = false;
@@ -1053,10 +1093,12 @@ function setNavText(main, meta) {
 }
 
 // ── Alerts Panel ──────────────────────────────────────────────────────────────
+// _alertLog est GLOBAL et persiste entre les changements de course
 let _alertLog       = [];
 let _flameCount     = {};
 let _flameSeen      = new Set();
 let _prevAlertState = {};
+const ALERT_MAX     = 20; // nb max d'alertes mémorisées toutes courses confondues
 
 function _pushAlerts(rows, raceLabel) {
   let added = false;
@@ -1068,12 +1110,14 @@ function _pushAlerts(rows, raceLabel) {
 
     if (isAlert && !wasAlert) {
       _flameCount[key] = (_flameCount[key] || 0) + 1;
+      const flames = _flameCount[key];
       _alertLog.unshift({
         race: raceLabel, num: r.num, nom: r.nom,
         prev: r.cote_prev, cote: r.cote_now, drop: r.drop_pct,
         time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+        flames, // 1 = première fois, >1 = récidive
       });
-      if (_alertLog.length > 3) _alertLog = _alertLog.slice(0, 3);
+      if (_alertLog.length > ALERT_MAX) _alertLog = _alertLog.slice(0, ALERT_MAX);
       added = true;
     }
   });
@@ -1092,20 +1136,23 @@ function _renderAlertLog() {
     return;
   }
   panel.classList.add("has-alerts");
-  badge.textContent = Math.min(_alertLog.length, 3);
+  badge.textContent = _alertLog.length;
   badge.classList.add("show");
 
   list.innerHTML = _alertLog.map(a => {
-    const nom  = a.nom.length > 14 ? a.nom.substring(0, 13) + "." : a.nom;
-    const prev = a.prev ? a.prev.toFixed(1) : "—";
-    return `<div class="alert-row">
+    const nom      = a.nom.length > 14 ? a.nom.substring(0, 13) + "." : a.nom;
+    const prev     = a.prev ? a.prev.toFixed(1) : "—";
+    const isNew    = a.flames === 1;
+    const recurTag = !isNew ? `<span class="alert-recur-tag">×${a.flames} 🔥</span>` : "";
+    const rowClass = isNew ? "alert-row" : "alert-row alert-row-recur";
+    return `<div class="${rowClass}">
       <span class="alert-row-race">${a.race}</span>
       <span class="alert-row-num">${a.num}</span>
-      <span class="alert-row-nom">N°${a.num} ${nom}</span>
+      <span class="alert-row-nom">N°${a.num} ${nom}${recurTag}</span>
       <span class="alert-row-prev">${prev}</span>
       <span class="alert-row-arrow">→</span>
       <span class="alert-row-cote">${a.cote.toFixed(1)}</span>
-      <span class="alert-row-drop">-${Math.abs(a.drop)}%</span>
+      <span class="alert-row-drop">-${Math.abs(a.drop_pct)}%</span>
       <span class="alert-row-time">${a.time}</span>
     </div>`;
   }).join("");
@@ -1116,7 +1163,10 @@ function clearAlerts() {
   _renderAlertLog();
 }
 
-function toggleAlertsPanel() {}
+function toggleAlertsPanel() {
+  const panel = document.getElementById("alertsPanel");
+  panel.classList.toggle("collapsed");
+}
 
 // ── Rendu lignes ──────────────────────────────────────────────────────────────
 function renderRows(rows, raceStarted) {
