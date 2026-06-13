@@ -1004,9 +1004,26 @@ async function loadAllCourses(autoSelectIdx = null) {
       targetIdx = found !== -1 ? found : _curIdx;
     } else {
       const now = Date.now();
-      targetIdx = all.findIndex(c => c.heureDepart && c.heureDepart > now);
-      if (targetIdx === -1) targetIdx = all.length - 1;
-      if (targetIdx < 0)   targetIdx = 0;
+      // Chercher la course en cours ou la prochaine :
+      // On prend la première course dont le départ est dans le futur,
+      // OU la dernière course démarrée depuis moins de AUTO_ADVANCE_MIN minutes
+      let bestIdx = -1;
+      for (let i = 0; i < all.length; i++) {
+        const ts = all[i].heureDepart;
+        if (!ts) continue;
+        const elapsed = (now - ts) / 1000;
+        if (ts > now) {
+          // Course future → c'est la prochaine, on s'arrête
+          bestIdx = i;
+          break;
+        } else if (elapsed < AUTO_ADVANCE_MIN * 60) {
+          // Course démarrée depuis moins de AUTO_ADVANCE_MIN min → encore en cours
+          bestIdx = i;
+        }
+      }
+      if (bestIdx === -1) targetIdx = all.length - 1;
+      else targetIdx = bestIdx;
+      if (targetIdx < 0) targetIdx = 0;
     }
     targetIdx = Math.max(0, Math.min(targetIdx, all.length - 1));
     await selectCourseAt(targetIdx);
