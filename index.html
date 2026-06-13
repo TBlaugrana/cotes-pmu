@@ -819,13 +819,12 @@ async function refreshLoop() {
       document.getElementById("statusText").textContent = "En attente des cotes";
     }
 
-    // Détecter cotes figées → avance auto (pas en mode consultation)
+    // BUG 1 FIX: l'avance auto est gérée UNIQUEMENT par le countdown (startCountdown)
+    // On garde _frozenAutoAdvanced pour bloquer tout saut résiduel
     if (_lastOddsChangeTs && !_frozenAutoAdvanced && !_loadingNav && _browseIdx === null) {
       const frozenSec = (now - _lastOddsChangeTs) / 1000;
       if (frozenSec >= AUTO_ADVANCE_MIN * 60 && _curIdx < _allCourses.length - 1) {
-        _frozenAutoAdvanced = true;
-        document.getElementById("statusText").textContent = "Cotes figées — passage course suivante...";
-        setTimeout(() => navCourse(+1), 1500);
+        _frozenAutoAdvanced = true; // bloquer sans naviguer — le countdown s'en charge
       }
     }
 
@@ -947,8 +946,11 @@ function startCountdown(departTs, departStr) {
       cdSub.textContent  = "après le départ";
       document.body.classList.add("race-started");
 
-      if (elapsed >= AUTO_ADVANCE_MIN * 60 && !_autoAdvanced && _curIdx < _allCourses.length - 1 && _browseIdx === null) {
+      // BUG 1+2 FIX: avance auto uniquement ici (countdown), plus dans refreshLoop
+      // On vérifie aussi _frozenAutoAdvanced pour éviter double déclenchement
+      if (elapsed >= AUTO_ADVANCE_MIN * 60 && !_autoAdvanced && !_frozenAutoAdvanced && _curIdx < _allCourses.length - 1 && _browseIdx === null) {
         _autoAdvanced = true;
+        _frozenAutoAdvanced = true; // verrouiller refreshLoop aussi
         loadAllCourses(_curIdx + 1);
       }
     }
@@ -1128,6 +1130,17 @@ function renderBrowseRows(rows, alerts, course) {
     return;
   }
 
+  // Construire un map num → flammes depuis l'historique du jour (persistant)
+  const raceLabel = `R${course.rId}C${course.cId}`;
+  const flameMap = {}; // num → nombre de flammes
+  const alertsByNum = {}; // num → dernière alerte
+  for (const a of _alertLog) {
+    if (a.race === raceLabel) {
+      flameMap[String(a.num)] = (_flameCount[`${raceLabel}-${a.num}`] || 1);
+      alertsByNum[String(a.num)] = a;
+    }
+  }
+
   // Afficher les alertes mémorisées en haut si il y en a
   let alertHtml = "";
   if (alerts.length > 0) {
@@ -1135,8 +1148,11 @@ function renderBrowseRows(rows, alerts, course) {
       <div style="font-family:var(--cond);font-weight:900;font-size:13px;color:var(--danger);letter-spacing:1px;margin-bottom:6px;">🔥 ALERTES ENREGISTRÉES</div>
       ${alerts.map(a => {
         const prev = a.prev ? a.prev.toFixed(1) : "—";
+        const flames = (_flameCount[`${raceLabel}-${a.num}`] || 1);
+        const flameStr = "🔥".repeat(Math.min(flames, 5));
         return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px;">
           <span style="font-family:var(--cond);font-weight:700;font-size:16px;color:var(--text);">N°${a.num} ${a.nom}</span>
+          <span style="font-size:14px;">${flameStr}</span>
           <span style="color:var(--dim);font-size:11px;">${prev} → </span>
           <span style="font-family:var(--cond);font-weight:700;color:var(--danger);">${a.cote.toFixed(1)}</span>
           <span style="background:var(--danger);color:#fff;border-radius:4px;padding:1px 6px;font-size:11px;font-family:var(--cond);font-weight:900;">-${Math.abs(a.drop)}%</span>
@@ -1147,9 +1163,10 @@ function renderBrowseRows(rows, alerts, course) {
   }
 
   el.innerHTML = alertHtml + rows.map(d => {
-    const nom   = d.nom.length > 12 ? d.nom.substring(0, 11) + "." : d.nom;
-    const flame = d._flames > 0 ? `<span class="alert-tag">${"🔥".repeat(d._flames)}</span>` : "";
-    const rowCls = d._flames > 0 ? "hi-alert" : "";
+    const nom    = d.nom.length > 12 ? d.nom.substring(0, 11) + "." : d.nom;
+    const flames = flameMap[String(d.num)] || d._flames || 0;
+    const flame  = flames > 0 ? `<span class="alert-tag">${"🔥".repeat(Math.min(flames, 5))}</span>` : "";
+    const rowCls = flames > 0 ? "hi-alert" : "";
     return `<div class="row ${rowCls}" data-num="${d.num}">
       <div class="row-num">${d.num}</div>
       <div class="row-nom" title="${d.nom}">${nom}${flame}</div>
@@ -1219,7 +1236,8 @@ async function selectCourseAt(idx) {
     if (elapsedSinceStart > 0) {
       // Partir du depart comme reference pour le timer "cotes figees"
       _lastOddsChangeTs = c.heureDepart;
-      // Si deja > AUTO_ADVANCE_MIN apres le depart, bloquer les sauts auto
+      // BUG 2 FIX: si la course est déjà vieille, bloquer IMMÉDIATEMENT les deux gardes
+      // pour éviter qu'un tick() ou refreshLoop déclenche une avance juste après sélection manuelle
       if (elapsedSinceStart >= AUTO_ADVANCE_MIN * 60) {
         _autoAdvanced       = true;
         _frozenAutoAdvanced = true;
@@ -1269,10 +1287,15 @@ function _storageKey() {
 
 function _saveToStorage() {
   try {
-    localStorage.setItem(_storageKey(), JSON.stringify({
+    const sk = _storageKey();
+    const raw = localStorage.getItem(sk);
+    const existing = raw ? JSON.parse(raw) : {};
+    // BUG 3 FIX: préserver activeCourse lors de la sauvegarde des alertes
+    localStorage.setItem(sk, JSON.stringify({
       alertLog:       _alertLog,
       flameCount:     _flameCount,
       prevAlertState: _prevAlertState,
+      activeCourse:   existing.activeCourse || null,
     }));
   } catch(e) {}
 }
