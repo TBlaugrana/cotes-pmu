@@ -796,7 +796,9 @@ async function refreshLoop() {
 
     if (Object.keys(odds).length > 0) {
       // Détecter changement de cotes
-      const oddsChanged = !Object.keys(_odds).length ||
+      // Note: si _odds est vide c'est le premier chargement, pas un vrai changement
+      const isFirstLoad = !Object.keys(_odds).length;
+      const oddsChanged = !isFirstLoad &&
         Object.keys({ ..._odds, ...odds }).some(k =>
           (odds[k]?.cote) !== (_odds[k]?.cote));
 
@@ -804,7 +806,10 @@ async function refreshLoop() {
       _odds     = odds;
       _refreshCount++;
 
+      // Ne mettre à jour _lastOddsChangeTs que sur un vrai changement de cotes,
+      // pas au premier chargement (évite d'écraser l'initialisation au départ)
       if (oddsChanged) _lastOddsChangeTs = now;
+      else if (isFirstLoad && !_lastOddsChangeTs) _lastOddsChangeTs = now;
 
       setStatusDot("live");
       document.getElementById("statusText").textContent  = "LIVE · " + new Date().toLocaleTimeString("fr-FR");
