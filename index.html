@@ -1004,26 +1004,52 @@ async function loadAllCourses(autoSelectIdx = null) {
       targetIdx = found !== -1 ? found : _curIdx;
     } else {
       const now = Date.now();
-      // Chercher la course en cours ou la prochaine :
-      // On prend la première course dont le départ est dans le futur,
-      // OU la dernière course démarrée depuis moins de AUTO_ADVANCE_MIN minutes
-      let bestIdx = -1;
-      for (let i = 0; i < all.length; i++) {
-        const ts = all[i].heureDepart;
-        if (!ts) continue;
-        const elapsed = (now - ts) / 1000;
-        if (ts > now) {
-          // Course future → c'est la prochaine, on s'arrête
-          bestIdx = i;
-          break;
-        } else if (elapsed < AUTO_ADVANCE_MIN * 60) {
-          // Course démarrée depuis moins de AUTO_ADVANCE_MIN min → encore en cours
-          bestIdx = i;
+
+      // Tenter de restaurer la course mémorisée (sauvegardée avant un refresh)
+      let restoredIdx = -1;
+      try {
+        const raw = localStorage.getItem(_storageKey());
+        if (raw) {
+          const stored = JSON.parse(raw);
+          if (stored.activeCourse) {
+            const ac = stored.activeCourse;
+            const fi = all.findIndex(c => c.rId === ac.rId && c.cId === ac.cId);
+            if (fi !== -1) {
+              const elapsed = ac.heureDepart ? (now - ac.heureDepart) / 1000 : 0;
+              // Restaurer si la course a démarré depuis moins de 30 minutes
+              // (au-delà on laisse l'algo choisir la prochaine)
+              if (elapsed < 30 * 60) {
+                restoredIdx = fi;
+              }
+            }
+          }
         }
+      } catch(e) {}
+
+      if (restoredIdx !== -1) {
+        targetIdx = restoredIdx;
+      } else {
+        // Chercher la course en cours ou la prochaine :
+        // On prend la première course dont le départ est dans le futur,
+        // OU la dernière course démarrée depuis moins de AUTO_ADVANCE_MIN minutes
+        let bestIdx = -1;
+        for (let i = 0; i < all.length; i++) {
+          const ts = all[i].heureDepart;
+          if (!ts) continue;
+          const elapsed = (now - ts) / 1000;
+          if (ts > now) {
+            // Course future → c'est la prochaine, on s'arrête
+            bestIdx = i;
+            break;
+          } else if (elapsed < AUTO_ADVANCE_MIN * 60) {
+            // Course démarrée depuis moins de AUTO_ADVANCE_MIN min → encore en cours
+            bestIdx = i;
+          }
+        }
+        if (bestIdx === -1) targetIdx = all.length - 1;
+        else targetIdx = bestIdx;
+        if (targetIdx < 0) targetIdx = 0;
       }
-      if (bestIdx === -1) targetIdx = all.length - 1;
-      else targetIdx = bestIdx;
-      if (targetIdx < 0) targetIdx = 0;
     }
     targetIdx = Math.max(0, Math.min(targetIdx, all.length - 1));
     await selectCourseAt(targetIdx);
@@ -1176,6 +1202,15 @@ async function selectCourseAt(idx) {
   _selectedCourse  = c.cId;
   _departTs        = c.heureDepart || null;
   _departStr       = c.cHeure || "";
+
+  // Mémoriser la course active pour la restaurer après un refresh Safari
+  try {
+    const sk = _storageKey();
+    const raw = localStorage.getItem(sk);
+    const stored = raw ? JSON.parse(raw) : {};
+    stored.activeCourse = { rId: c.rId, cId: c.cId, heureDepart: c.heureDepart };
+    localStorage.setItem(sk, JSON.stringify(stored));
+  } catch(e) {}
 
   // Si on charge/recharge APRES le depart, initialiser les gardes-fous
   // pour eviter un saut automatique immediat vers la course suivante
