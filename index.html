@@ -1130,19 +1130,17 @@ async function selectCourseAt(idx) {
   document.getElementById("alertBanner").className = "";
   document.body.classList.remove("race-started");
 
-  // Reset état pour la nouvelle course
-  _odds            = {};
-  _oddsPrev        = {};
-  _droppedHorses   = new Set();
-  _refreshCount    = 0;
+  // Reset etat cotes uniquement — NE PAS effacer l'historique d'alertes
+  _odds             = {};
+  _oddsPrev         = {};
+  _droppedHorses    = new Set();
+  _refreshCount     = 0;
   _lastOddsChangeTs = null;
-  _flameCount      = {};
-  _flameSeen       = new Set();
-  _prevAlertState  = {};
-  _alertLog        = [];
-  _courseChangePending  = true;
-  _frozenAutoAdvanced   = false;
-  _autoAdvanced         = false;
+  _courseChangePending = true;
+  _frozenAutoAdvanced  = false;
+  _autoAdvanced        = false;
+  // Recharger alertes/flammes depuis localStorage pour ne jamais les perdre
+  _loadFromStorage();
   _renderAlertLog();
 
   stopCountdown();
