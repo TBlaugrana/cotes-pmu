@@ -484,7 +484,15 @@ body:not(.race-started) .row-drop { visibility: hidden; }
   width: 52px;
   flex-shrink: 0;
 }
-.alert-row-num { display: none; }
+.alert-row-num {
+  font-family: var(--cond);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
 .alert-row-nom {
   font-family: var(--cond);
   font-weight: 700;
@@ -847,8 +855,6 @@ function renderFromState() {
       dropPct = Math.round((cotePrev - coteNow) / cotePrev * 1000) / 10;
       if (raceStarted && dropPct >= DROP_ALERT && coteNow >= COTE_MIN && coteNow <= COTE_MAX) {
         alert = true;
-      }
-      if (dropPct >= DROP_ALERT && coteNow >= COTE_MIN && coteNow <= COTE_MAX) {
         _droppedHorses.add(num);
       }
     }
@@ -927,7 +933,6 @@ function startCountdown(departTs, departStr) {
       cdMain.className   = sec <= 60 ? "imminent" : sec <= 180 ? "soon" : "";
       cdSub.textContent  = "avant le départ";
       document.body.classList.remove("race-started");
-      _autoAdvanced = false;
     } else {
       const elapsed = Math.abs(sec);
       const em = Math.floor(elapsed / 60);
@@ -969,7 +974,7 @@ async function loadAllCourses(autoSelectIdx = null) {
           all.push({
             rId: reu.id, rLabel: reu.label,
             cId: c.id, cHeure: c.heure, cLabel: c.label,
-            heureDepart: c.heureDepart ? parseInt(c.heureDepart) : null,
+            heureDepart: c.heureDepart ? (parseInt(c.heureDepart) || null) : null,
           });
         }
       } catch(_) {}
@@ -1258,7 +1263,7 @@ function _renderAlertLog() {
     return `<div class="alert-row">
       <span class="alert-row-race">${a.race}</span>
       <span class="alert-row-num">${a.num}</span>
-      <span class="alert-row-nom">N°${a.num} ${nom}</span>
+      <span class="alert-row-nom">${nom}</span>
       <span class="alert-row-prev">${prev}</span>
       <span class="alert-row-arrow">→</span>
       <span class="alert-row-cote">${a.cote.toFixed(1)}</span>
@@ -1274,7 +1279,14 @@ function clearAlerts() {
   _renderAlertLog();
 }
 
-function toggleAlertsPanel() {}
+function toggleAlertsPanel() {
+  const panel = document.getElementById("alertsPanel");
+  const list  = document.getElementById("alertsList");
+  if (!panel.classList.contains("has-alerts")) return;
+  const isOpen = list.style.display !== "none" && list.style.display !== "";
+  list.style.display = isOpen ? "none" : "";
+  document.getElementById("alertsPanelHeader").title = isOpen ? "Afficher les alertes" : "Masquer les alertes";
+}
 
 // ── Rendu lignes ──────────────────────────────────────────────────────────────
 function renderRows(rows, raceStarted) {
