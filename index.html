@@ -947,11 +947,11 @@ function startCountdown(departTs, departStr) {
       document.body.classList.add("race-started");
 
       // BUG 1+2 FIX: avance auto uniquement ici (countdown), plus dans refreshLoop
-      // On vérifie aussi _frozenAutoAdvanced pour éviter double déclenchement
+      // selectCourseAt est instantané (pas de rechargement programme complet)
       if (elapsed >= AUTO_ADVANCE_MIN * 60 && !_autoAdvanced && !_frozenAutoAdvanced && _curIdx < _allCourses.length - 1 && _browseIdx === null) {
         _autoAdvanced = true;
-        _frozenAutoAdvanced = true; // verrouiller refreshLoop aussi
-        loadAllCourses(_curIdx + 1);
+        _frozenAutoAdvanced = true;
+        selectCourseAt(_curIdx + 1);
       }
     }
   }
