@@ -571,6 +571,12 @@ body:not(.race-started) .row-drop { visibility: hidden; }
   <button class="nav-btn" id="btnNext" onclick="navCourse(+1)" disabled title="Course suivante">▶</button>
 </div>
 
+<!-- BROWSE BAR -->
+<div id="browseBar" style="display:none; flex-shrink:0; align-items:center; gap:10px; padding:6px 14px; background:#fff3e0; border-bottom:2px solid #e07800; font-size:11px; color:#e07800; letter-spacing:1px; font-family:var(--mono);">
+  <span style="flex:1">📂 MODE CONSULTATION — les données live continuent en arrière-plan</span>
+  <button onclick="exitBrowseMode()" style="padding:3px 12px; border:1.5px solid #e07800; border-radius:5px; background:none; color:#e07800; font-family:var(--mono); font-size:11px; cursor:pointer; letter-spacing:1px;">⬅ Retour LIVE</button>
+</div>
+
 <!-- STATUS BAR -->
 <div id="statusBar">
   <div id="statusDot"></div>
@@ -800,8 +806,8 @@ async function refreshLoop() {
       document.getElementById("statusText").textContent = "En attente des cotes";
     }
 
-    // Détecter cotes figées → avance auto
-    if (_lastOddsChangeTs && !_frozenAutoAdvanced && !_loadingNav) {
+    // Détecter cotes figées → avance auto (pas en mode consultation)
+    if (_lastOddsChangeTs && !_frozenAutoAdvanced && !_loadingNav && _browseIdx === null) {
       const frozenSec = (now - _lastOddsChangeTs) / 1000;
       if (frozenSec >= AUTO_ADVANCE_MIN * 60 && _curIdx < _allCourses.length - 1) {
         _frozenAutoAdvanced = true;
@@ -810,7 +816,10 @@ async function refreshLoop() {
       }
     }
 
-    renderFromState();
+    // Ne pas écraser l'affichage si on est en mode consultation
+    if (_browseIdx === null) {
+      renderFromState();
+    }
 
   } catch(e) {
     setStatusDot("error");
@@ -873,6 +882,25 @@ let _autoAdvanced = false;
 let _frozenAutoAdvanced  = false;
 let _courseChangePending = true;
 
+// ── Mode consultation (naviguer sur une course passée sans être rebasculé) ────
+let _browseIdx    = null;   // null = mode live, sinon index consulté
+let _browseOdds   = {};     // snapshot des cotes de la course consultée
+let _browseAlerts = [];     // snapshot des alertes de la course consultée
+
+function enterBrowseMode(idx) {
+  _browseIdx    = idx;
+  _browseOdds   = {};
+  _browseAlerts = [];
+  document.getElementById("browseBar").style.display = "flex";
+}
+function exitBrowseMode() {
+  _browseIdx = null;
+  document.getElementById("browseBar").style.display = "none";
+  // Reafficher la course live
+  renderFromState();
+  _renderAlertLog();
+}
+
 // ── Countdown ─────────────────────────────────────────────────────────────────
 let _cdInterval  = null;
 let _departTsLoc = null;
@@ -909,7 +937,7 @@ function startCountdown(departTs, departStr) {
       cdSub.textContent  = "après le départ";
       document.body.classList.add("race-started");
 
-      if (elapsed >= AUTO_ADVANCE_MIN * 60 && !_autoAdvanced && _curIdx < _allCourses.length - 1) {
+      if (elapsed >= AUTO_ADVANCE_MIN * 60 && !_autoAdvanced && _curIdx < _allCourses.length - 1 && _browseIdx === null) {
         _autoAdvanced = true;
         loadAllCourses(_curIdx + 1);
       }
@@ -981,9 +1009,108 @@ async function loadAllCourses(autoSelectIdx = null) {
 
 async function navCourse(delta) {
   if (_loadingNav) return;
-  const newIdx = _curIdx + delta;
+
+  // Index de base : si on est en mode consultation, partir de là
+  const baseIdx = _browseIdx !== null ? _browseIdx : _curIdx;
+  const newIdx  = baseIdx + delta;
   if (newIdx < 0 || newIdx >= _allCourses.length) return;
-  await selectCourseAt(newIdx);
+
+  // Si on revient sur la course live, quitter le mode consultation
+  if (newIdx === _curIdx) {
+    exitBrowseMode();
+    return;
+  }
+
+  // Sinon entrer/rester en mode consultation
+  enterBrowseMode(newIdx);
+  await loadBrowseCourse(newIdx);
+}
+
+async function loadBrowseCourse(idx) {
+  if (idx < 0 || idx >= _allCourses.length) return;
+  const c = _allCourses[idx];
+
+  // Mettre à jour l'affichage du navigateur
+  const rShort = c.rLabel.replace(/^R\d+ — /, "").substring(0, 16);
+  const cName  = c.cLabel.replace(/^C\d+ — /, "").substring(0, 16);
+  document.getElementById("navCourse").textContent = `R${c.rId} C${c.cId}`;
+  document.getElementById("navMeta").textContent   = rShort + (cName ? "  ·  " + cName : "");
+
+  updateBrowseNavButtons();
+
+  // Charger les cotes de la course consultée
+  document.getElementById("rows").innerHTML = '<div class="empty"><span class="icon">📡</span>Chargement de la course...</div>';
+
+  try {
+    const odds = await fetchOdds(c.rId, c.cId);
+    if (_browseIdx !== idx) return; // l'utilisateur a déjà navigué ailleurs
+
+    // Construire les lignes avec l'historique d'alertes global
+    const raceLabel = `R${c.rId}C${c.cId}`;
+    const rows = [];
+    for (const [num, info] of Object.entries(odds)) {
+      const flameKey = `${raceLabel}-${num}`;
+      const flames   = _flameCount[flameKey] || 0;
+      rows.push({
+        num, nom: info.nom, cote_now: info.cote,
+        cote_prev: null, drop_pct: 0, alert: false,
+        ever_dropped: flames > 0, _flames: flames,
+      });
+    }
+    rows.sort((a, b) => a.cote_now - b.cote_now);
+
+    // Afficher les alertes mémorisées pour cette course
+    const browseAlerts = _alertLog.filter(a => a.race === raceLabel);
+    renderBrowseRows(rows.filter(r => r.cote_now <= COTE_MAX), browseAlerts, c);
+  } catch(e) {
+    if (_browseIdx === idx)
+      document.getElementById("rows").innerHTML = '<div class="empty"><span class="icon">⚠️</span>Impossible de charger les cotes</div>';
+  }
+}
+
+function renderBrowseRows(rows, alerts, course) {
+  const el = document.getElementById("rows");
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty"><span class="icon">📡</span>Aucune cote disponible pour cette course</div>';
+    return;
+  }
+
+  // Afficher les alertes mémorisées en haut si il y en a
+  let alertHtml = "";
+  if (alerts.length > 0) {
+    alertHtml = `<div style="background:var(--danger-bg);border-bottom:2px solid var(--danger);padding:8px 14px;">
+      <div style="font-family:var(--cond);font-weight:900;font-size:13px;color:var(--danger);letter-spacing:1px;margin-bottom:6px;">🔥 ALERTES ENREGISTRÉES</div>
+      ${alerts.map(a => {
+        const prev = a.prev ? a.prev.toFixed(1) : "—";
+        return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px;">
+          <span style="font-family:var(--cond);font-weight:700;font-size:16px;color:var(--text);">N°${a.num} ${a.nom}</span>
+          <span style="color:var(--dim);font-size:11px;">${prev} → </span>
+          <span style="font-family:var(--cond);font-weight:700;color:var(--danger);">${a.cote.toFixed(1)}</span>
+          <span style="background:var(--danger);color:#fff;border-radius:4px;padding:1px 6px;font-size:11px;font-family:var(--cond);font-weight:900;">-${Math.abs(a.drop)}%</span>
+          <span style="color:var(--muted);font-size:10px;margin-left:auto;">${a.time}</span>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }
+
+  el.innerHTML = alertHtml + rows.map(d => {
+    const nom   = d.nom.length > 12 ? d.nom.substring(0, 11) + "." : d.nom;
+    const flame = d._flames > 0 ? `<span class="alert-tag">${"🔥".repeat(d._flames)}</span>` : "";
+    const rowCls = d._flames > 0 ? "hi-alert" : "";
+    return `<div class="row ${rowCls}" data-num="${d.num}">
+      <div class="row-num">${d.num}</div>
+      <div class="row-nom" title="${d.nom}">${nom}${flame}</div>
+      <div class="row-prev">—</div>
+      <div class="row-cote">${d.cote_now.toFixed(1)}</div>
+      <div class="row-drop c-none">—</div>
+    </div>`;
+  }).join("");
+}
+
+function updateBrowseNavButtons() {
+  const baseIdx = _browseIdx !== null ? _browseIdx : _curIdx;
+  document.getElementById("btnPrev").disabled = _loadingNav || baseIdx <= 0;
+  document.getElementById("btnNext").disabled = _loadingNav || baseIdx >= _allCourses.length - 1;
 }
 
 async function selectCourseAt(idx) {
@@ -1036,6 +1163,7 @@ async function selectCourseAt(idx) {
 }
 
 function updateNavButtons() {
+  if (_browseIdx !== null) { updateBrowseNavButtons(); return; }
   document.getElementById("btnPrev").disabled = _loadingNav || _curIdx <= 0;
   document.getElementById("btnNext").disabled = _loadingNav || _curIdx >= _allCourses.length - 1;
 }
