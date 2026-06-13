@@ -1236,11 +1236,16 @@ async function selectCourseAt(idx) {
     if (elapsedSinceStart > 0) {
       // Partir du depart comme reference pour le timer "cotes figees"
       _lastOddsChangeTs = c.heureDepart;
-      // BUG 2 FIX: si la course est déjà vieille, bloquer IMMÉDIATEMENT les deux gardes
-      // pour éviter qu'un tick() ou refreshLoop déclenche une avance juste après sélection manuelle
+      // Si la course a déjà démarré depuis plus de AUTO_ADVANCE_MIN,
+      // on bloque brièvement le saut immédiat (2s) puis on laisse le countdown décider
       if (elapsedSinceStart >= AUTO_ADVANCE_MIN * 60) {
         _autoAdvanced       = true;
         _frozenAutoAdvanced = true;
+        // Lever le verrou après 2s : le countdown reprend la main et saute si nécessaire
+        setTimeout(() => {
+          _autoAdvanced       = false;
+          _frozenAutoAdvanced = false;
+        }, 2000);
       }
     }
   }
