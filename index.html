@@ -638,7 +638,9 @@ const DROP_ALERT = 10.0;
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 
 // ── API PMU (appelée directement via proxy CORS) ─────────────────────────────
-const PMU_BASE = "https://online.turfinfo.api.pmu.fr/rest/client/7/programme";
+const PMU_BASE        = "https://online.turfinfo.api.pmu.fr/rest/client/7/programme";
+const PMU_BASE_PROG   = "https://online.turfinfo.api.pmu.fr/rest/client/62/programme";
+const PMU_BASE_PARAMS = "?meteo=true&specialisation=OFFLINE";
 
 // Headers que l'API PMU attend (reproduit exactement server.py)
 const PMU_HEADERS = {
@@ -715,9 +717,39 @@ async function pmuFetch(path) {
   throw new Error("Échec toutes stratégies :\n" + errors.join(" | "));
 }
 
+// ── Fetch via client/62 (réunions + courses) ──────────────────────────────────
+async function pmuFetchProg(path) {
+  const url = PMU_BASE_PROG + path + PMU_BASE_PARAMS;
+  const errors = [];
+
+  for (let attempt = 0; attempt < PROXY_STRATEGIES.length; attempt++) {
+    const idx = (_proxyIdx + attempt) % PROXY_STRATEGIES.length;
+    const strategy = PROXY_STRATEGIES[idx];
+    // Reconstruire fetchUrl en remplaçant la base client/7 par client/62
+    const { fetchUrl: origFetchUrl, options } = strategy.build(PMU_BASE + path);
+    const fetchUrl = origFetchUrl.replace(
+      /rest\/client\/7\/programme([^?]*)/,
+      `rest/client/62/programme$1${PMU_BASE_PARAMS}`
+    );
+    try {
+      const resp = await fetch(fetchUrl, { ...options, signal: AbortSignal.timeout(6000) });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (idx !== _proxyIdx) {
+        _proxyIdx = idx;
+        document.getElementById("proxyStatus").textContent = strategy.label;
+      }
+      return data;
+    } catch(e) {
+      errors.push(`[${strategy.label}] ${e.message}`);
+    }
+  }
+  throw new Error("Échec toutes stratégies :\n" + errors.join(" | "));
+}
+
 // ── Fetch réunions ────────────────────────────────────────────────────────────
 async function fetchReunions() {
-  const data = await pmuFetch(`/${today()}`);
+  const data = await pmuFetchProg(`/${today()}`);
   const out = [];
   for (const r of (data?.programme?.reunions || [])) {
     const num  = r.numOfficiel ?? r.numExterne ?? 0;
@@ -729,7 +761,7 @@ async function fetchReunions() {
 
 // ── Fetch courses ─────────────────────────────────────────────────────────────
 async function fetchCourses(rNum) {
-  const data = await pmuFetch(`/${today()}/R${rNum}`);
+  const data = await pmuFetchProg(`/${today()}/R${rNum}`);
   const rawCourses = data?.courses ?? data?.reunion?.courses ?? [];
   return rawCourses.map(c => {
     const num   = c.numOrdre ?? 0;
